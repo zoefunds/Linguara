@@ -6,17 +6,18 @@ import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/store/auth.store';
 
 const titles: Record<string, string> = {
-  '/dashboard/translate': 'Translation Workspace',
-  '/dashboard/history': 'Translation History',
-  '/dashboard/documents': 'Documents',
-  '/dashboard/audit': 'Audit Trail',
-  '/dashboard/reports': 'Reports',
-  '/dashboard/wallet': 'Wallet',
-  '/dashboard/settings': 'Settings',
+  'translate': 'Translation Workspace',
+  'history': 'Translation History',
+  'documents': 'Documents',
+  'audit': 'Audit Trail',
+  'reports': 'Reports',
+  'wallet': 'Wallet',
+  'settings': 'Settings',
 };
 
 export function DashboardHeader() {
   const pathname = usePathname();
+  const segment = pathname.split('/dashboard/')[1]?.split('/')[0] ?? '';
   const { user, logout } = useAuthStore();
   const router = useRouter();
 
@@ -26,7 +27,7 @@ export function DashboardHeader() {
         <div className="md:hidden">
           <Globe className="h-5 w-5 text-primary" />
         </div>
-        <h1 className="font-semibold">{titles[pathname] || 'Dashboard'}</h1>
+        <h1 className="font-semibold">{titles[segment] || 'Dashboard'}</h1>
       </div>
 
       <div className="flex items-center gap-3">
