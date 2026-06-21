@@ -18,8 +18,20 @@ const app = express();
 
 // Security
 app.use(helmet());
+const allowedOrigins = [
+  config.frontendUrl,
+  'http://localhost:3000',
+  'https://linguara-sigma.vercel.app',
+];
+
 app.use(cors({
-  origin: [config.frontendUrl, 'http://localhost:3000'],
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`CORS: ${origin} not allowed`));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
