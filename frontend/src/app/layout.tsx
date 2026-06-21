@@ -14,10 +14,10 @@ export const metadata: Metadata = {
     title: 'Linguara — Trustworthy AI Translation',
     description: 'Decentralized AI consensus translation, verified on-chain.',
     type: 'website',
-    url: 'https://linguara.vercel.app',
+    url: 'https://linguara-sigma.vercel.app',
   },
   twitter: { card: 'summary_large_image', title: 'Linguara', description: 'AI-powered translation verified on-chain.' },
-  metadataBase: new URL('https://linguara.vercel.app'),
+  metadataBase: new URL('https://linguara-sigma.vercel.app'),
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
