@@ -1,0 +1,104 @@
+{
+  "nav": {
+    "product": "Product",
+    "features": "Features",
+    "pricing": "Pricing",
+    "docs": "Docs",
+    "login": "Log in",
+    "getStarted": "Get started"
+  },
+  "hero": {
+    "badge": "Powered by GenLayer AI Consensus",
+    "title": "Trustworthy Translations,",
+    "titleHighlight": "Verified On-Chain",
+    "subtitle": "Linguara uses decentralized AI consensus to deliver accurate, context-aware translations across 100+ languages — with cryptographic proof of quality.",
+    "cta": "Start translating free",
+    "ctaSecondary": "See how it works",
+    "statsTranslations": "Translations verified",
+    "statsLanguages": "Languages supported",
+    "statsConfidence": "Avg. confidence score",
+    "statsUptime": "Uptime"
+  },
+  "features": {
+    "title": "Enterprise-grade translation infrastructure",
+    "subtitle": "Every translation passes through multi-agent AI consensus before delivery",
+    "consensus": { "title": "AI Consensus", "desc": "3 independent AI agents translate simultaneously. Consensus determines the best output." },
+    "semantic": { "title": "Semantic Verification", "desc": "Meaning, tone, and cultural context verified before delivery." },
+    "confidence": { "title": "Confidence Scores", "desc": "Every translation ships with a cryptographically-backed trust score." },
+    "audit": { "title": "Immutable Audit Trail", "desc": "Every translation decision is recorded on-chain via GenLayer." },
+    "legal": { "title": "Legal & Healthcare", "desc": "Domain-specific translation for contracts, medical records, and government docs." },
+    "wallet": { "title": "Your Wallet, Your Identity", "desc": "Every account gets a unique blockchain wallet. Export your private key anytime." }
+  },
+  "howItWorks": {
+    "title": "How Linguara works",
+    "step1": { "title": "Submit content", "desc": "Paste text, upload a document, or drop an image." },
+    "step2": { "title": "AI agents translate", "desc": "3 independent agents produce translations in parallel." },
+    "step3": { "title": "Consensus verification", "desc": "Semantic validators reach consensus on the best translation." },
+    "step4": { "title": "Verified delivery", "desc": "Receive your translation with a confidence score and on-chain proof." }
+  },
+  "pricing": {
+    "title": "Simple, transparent pricing",
+    "free": { "name": "Free", "price": "$0", "period": "/month", "cta": "Get started" },
+    "pro": { "name": "Pro", "price": "$29", "period": "/month", "cta": "Start free trial" },
+    "enterprise": { "name": "Enterprise", "price": "Custom", "period": "", "cta": "Contact us" }
+  },
+  "auth": {
+    "login": "Log in",
+    "register": "Create account",
+    "email": "Email address",
+    "password": "Password",
+    "fullName": "Full name",
+    "forgotPassword": "Forgot password?",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "signUp": "Sign up",
+    "orContinue": "Or continue with",
+    "agreeTerms": "By creating an account, you agree to our Terms and Privacy Policy",
+    "walletCreated": "A blockchain wallet will be created for your account"
+  },
+  "dashboard": {
+    "translate": "Translate",
+    "history": "History",
+    "documents": "Documents",
+    "audit": "Audit Trail",
+    "wallet": "Wallet",
+    "settings": "Settings",
+    "reports": "Reports"
+  },
+  "translation": {
+    "sourcePlaceholder": "Enter text to translate...",
+    "sourceLang": "Source language",
+    "targetLang": "Target language",
+    "detect": "Auto detect",
+    "domain": "Domain",
+    "translate": "Translate",
+    "translating": "Translating...",
+    "confidence": "Confidence",
+    "viewAudit": "View audit trail",
+    "copyResult": "Copy",
+    "domains": {
+      "general": "General",
+      "legal": "Legal",
+      "medical": "Medical",
+      "technical": "Technical",
+      "financial": "Financial",
+      "government": "Government"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Try again",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "copy": "Copy",
+    "copied": "Copied!"
+  }
+}

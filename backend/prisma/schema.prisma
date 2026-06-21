@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum TranslationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum DocumentType {
+  TEXT
+  DOCUMENT
+  IMAGE
+}
+
+model User {
+  id                String        @id @default(uuid())
+  email             String        @unique
+  passwordHash      String        @map("password_hash")
+  fullName          String        @map("full_name")
+  preferredLanguage String        @default("en") @map("preferred_language")
+  plan              UserPlan      @default(FREE)
+  emailVerified     Boolean       @default(false) @map("email_verified")
+  emailVerifyToken  String?       @map("email_verify_token")
+  resetPasswordToken String?      @map("reset_password_token")
+  resetPasswordExpiry DateTime?   @map("reset_password_expiry")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  wallet            Wallet?
+  translations      Translation[]
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+model Wallet {
+  id                 String   @id @default(uuid())
+  userId             String   @unique @map("user_id")
+  address            String   @unique
+  encryptedPrivateKey String  @map("encrypted_private_key")
+  iv                 String
+  authTag            String   @map("auth_tag")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("wallets")
+}
+
+model Translation {
+  id              String            @id @default(uuid())
+  userId          String            @map("user_id")
+  sourceText      String            @map("source_text") @db.Text
+  sourceLanguage  String            @map("source_language")
+  targetLanguage  String            @map("target_language")
+  documentType    DocumentType      @default(TEXT) @map("document_type")
+  fileUrl         String?           @map("file_url")
+  fileName        String?           @map("file_name")
+  status          TranslationStatus @default(PENDING)
+  domain          String            @default("general")
+  contractTxHash  String?           @map("contract_tx_hash")
+  finalTranslation String?          @map("final_translation") @db.Text
+  confidenceScore Float?            @map("confidence_score")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  completedAt     DateTime?         @map("completed_at")
+
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  results         TranslationResult[]
+  auditLogs       AuditLog[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("translations")
+}
+
+model TranslationResult {
+  id              String   @id @default(uuid())
+  translationId   String   @map("translation_id")
+  agentId         Int      @map("agent_id")
+  translatedText  String   @map("translated_text") @db.Text
+  confidenceScore Float    @map("confidence_score")
+  semanticScore   Float    @map("semantic_score")
+  toneScore       Float    @map("tone_score")
+  culturalScore   Float    @map("cultural_score")
+  isConsensus     Boolean  @default(false) @map("is_consensus")
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  translation     Translation @relation(fields: [translationId], references: [id], onDelete: Cascade)
+
+  @@index([translationId])
+  @@map("translation_results")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  translationId String?  @map("translation_id")
+  userId        String?  @map("user_id")
+  eventType     String   @map("event_type")
+  actor         String
+  payload       Json?
+  onChainRef    String?  @map("on_chain_ref")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  translation   Translation? @relation(fields: [translationId], references: [id], onDelete: SetNull)
+  user          User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([translationId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}

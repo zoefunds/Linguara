@@ -1,0 +1,104 @@
+{
+  "nav": {
+    "product": "Produit",
+    "features": "Fonctionnalités",
+    "pricing": "Tarifs",
+    "docs": "Documentation",
+    "login": "Connexion",
+    "getStarted": "Commencer"
+  },
+  "hero": {
+    "badge": "Propulsé par le consensus IA GenLayer",
+    "title": "Traductions fiables,",
+    "titleHighlight": "Vérifiées sur la blockchain",
+    "subtitle": "Linguara utilise le consensus IA décentralisé pour des traductions précises et contextuelles en 100+ langues — avec preuve cryptographique de qualité.",
+    "cta": "Commencer gratuitement",
+    "ctaSecondary": "Voir comment ça marche",
+    "statsTranslations": "Traductions vérifiées",
+    "statsLanguages": "Langues supportées",
+    "statsConfidence": "Score de confiance moyen",
+    "statsUptime": "Disponibilité"
+  },
+  "features": {
+    "title": "Infrastructure de traduction professionnelle",
+    "subtitle": "Chaque traduction passe par un consensus IA multi-agents avant livraison",
+    "consensus": { "title": "Consensus IA", "desc": "3 agents IA indépendants traduisent simultanément." },
+    "semantic": { "title": "Vérification sémantique", "desc": "Sens, ton et contexte culturel vérifiés." },
+    "confidence": { "title": "Scores de confiance", "desc": "Chaque traduction inclut un score de fiabilité." },
+    "audit": { "title": "Piste d'audit immuable", "desc": "Chaque décision est enregistrée sur GenLayer." },
+    "legal": { "title": "Juridique & Santé", "desc": "Traduction spécialisée pour contrats et dossiers médicaux." },
+    "wallet": { "title": "Votre portefeuille", "desc": "Chaque compte dispose d'un portefeuille blockchain unique." }
+  },
+  "howItWorks": {
+    "title": "Comment fonctionne Linguara",
+    "step1": { "title": "Soumettre le contenu", "desc": "Collez du texte, uploadez un document ou une image." },
+    "step2": { "title": "Les agents IA traduisent", "desc": "3 agents indépendants produisent des traductions en parallèle." },
+    "step3": { "title": "Vérification par consensus", "desc": "Les validateurs sémantiques choisissent la meilleure traduction." },
+    "step4": { "title": "Livraison vérifiée", "desc": "Recevez votre traduction avec score de confiance et preuve on-chain." }
+  },
+  "pricing": {
+    "title": "Tarification simple et transparente",
+    "free": { "name": "Gratuit", "price": "0€", "period": "/mois", "cta": "Commencer" },
+    "pro": { "name": "Pro", "price": "29€", "period": "/mois", "cta": "Essai gratuit" },
+    "enterprise": { "name": "Entreprise", "price": "Sur devis", "period": "", "cta": "Nous contacter" }
+  },
+  "auth": {
+    "login": "Connexion",
+    "register": "Créer un compte",
+    "email": "Adresse e-mail",
+    "password": "Mot de passe",
+    "fullName": "Nom complet",
+    "forgotPassword": "Mot de passe oublié ?",
+    "noAccount": "Pas de compte ?",
+    "hasAccount": "Déjà un compte ?",
+    "signUp": "S'inscrire",
+    "orContinue": "Ou continuer avec",
+    "agreeTerms": "En créant un compte, vous acceptez nos CGU et notre politique de confidentialité",
+    "walletCreated": "Un portefeuille blockchain sera créé pour votre compte"
+  },
+  "dashboard": {
+    "translate": "Traduire",
+    "history": "Historique",
+    "documents": "Documents",
+    "audit": "Piste d'audit",
+    "wallet": "Portefeuille",
+    "settings": "Paramètres",
+    "reports": "Rapports"
+  },
+  "translation": {
+    "sourcePlaceholder": "Entrez le texte à traduire...",
+    "sourceLang": "Langue source",
+    "targetLang": "Langue cible",
+    "detect": "Détection auto",
+    "domain": "Domaine",
+    "translate": "Traduire",
+    "translating": "Traduction en cours...",
+    "confidence": "Confiance",
+    "viewAudit": "Voir la piste d'audit",
+    "copyResult": "Copier",
+    "domains": {
+      "general": "Général",
+      "legal": "Juridique",
+      "medical": "Médical",
+      "technical": "Technique",
+      "financial": "Financier",
+      "government": "Gouvernemental"
+    }
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "retry": "Réessayer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "view": "Voir",
+    "close": "Fermer",
+    "back": "Retour",
+    "next": "Suivant",
+    "submit": "Envoyer",
+    "copy": "Copier",
+    "copied": "Copié !"
+  }
+}
