@@ -8,7 +8,6 @@ import { Globe, Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/store/auth.store';
 import { toast } from '@/hooks/use-toast';
 
@@ -40,56 +39,84 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <Link href="/" className="inline-flex items-center gap-2 text-2xl font-bold text-primary">
-            <Globe className="h-7 w-7" />
-            <span>Linguara</span>
-          </Link>
-          <p className="text-muted-foreground text-sm">Trustworthy multilingual translation</p>
+    <div className="min-h-screen bg-[#efece4] flex">
+      {/* Left panel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-foreground text-[#efece4] flex-col justify-between p-12">
+        <Link href="/" className="flex items-center gap-2 font-bold text-xl">
+          <Globe className="h-6 w-6 text-primary" />
+          <span>Linguara</span>
+        </Link>
+        <div className="space-y-6">
+          <p className="text-4xl font-bold leading-tight">
+            Translate with<br />AI consensus &<br />on-chain trust.
+          </p>
+          <p className="text-[#efece4]/70 text-sm leading-relaxed max-w-xs">
+            Every translation verified by multiple AI validators and recorded immutably on GenLayer.
+          </p>
+          <div className="flex items-center gap-2 text-sm text-[#efece4]/60">
+            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            Blockchain-verified identity
+          </div>
         </div>
+        <p className="text-xs text-[#efece4]/40">© 2025 Linguara AI. All rights reserved.</p>
+      </div>
 
-        <Card className="border-border/50 shadow-xl">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl">Welcome back</CardTitle>
-            <CardDescription>Sign in to your account</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email address</Label>
-                <Input id="email" type="email" placeholder="you@example.com" {...register('email')} />
-                {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link href="/auth/forgot-password" className="text-xs text-primary hover:underline">
-                    Forgot password?
-                  </Link>
-                </div>
-                <Input id="password" type="password" placeholder="••••••••" {...register('password')} />
-                {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
-              </div>
-              <Button type="submit" className="w-full" variant="gradient" size="lg" disabled={isLoading}>
-                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</> : 'Sign in'}
-              </Button>
-            </form>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">
-              Don't have an account?{' '}
-              <Link href="/auth/register" className="text-primary hover:underline font-medium">
-                Sign up free
-              </Link>
-            </p>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-              <span>Protected by blockchain-verified identity</span>
+      {/* Right panel */}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
+            <p className="text-muted-foreground text-sm">Sign in to your account to continue</p>
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email address</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                className="bg-white/70 border-[#d4cfc0] rounded-xl h-11"
+                {...register('email')}
+              />
+              {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
             </div>
-          </CardFooter>
-        </Card>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/auth/forgot-password" className="text-xs text-primary hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                className="bg-white/70 border-[#d4cfc0] rounded-xl h-11"
+                {...register('password')}
+              />
+              {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full rounded-full h-11"
+              variant="gradient"
+              size="lg"
+              disabled={isLoading}
+            >
+              {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</> : 'Sign in'}
+            </Button>
+          </form>
+
+          <p className="text-sm text-center text-muted-foreground">
+            Don't have an account?{' '}
+            <Link href="/auth/register" className="text-primary hover:underline font-medium">
+              Sign up free
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

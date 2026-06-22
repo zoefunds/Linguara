@@ -16,6 +16,7 @@ router.post('/', translationLimiter, [
   body('documentType').optional().isIn(['TEXT', 'DOCUMENT', 'IMAGE']),
 ], validate, translation.createTranslation);
 
+router.post('/extract-file', translation.extractFile);
 router.get('/', translation.listTranslations);
 router.get('/audit', translation.getAuditLog);
 router.get('/:id', translation.getTranslation);

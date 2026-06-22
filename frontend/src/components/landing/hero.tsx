@@ -1,126 +1,114 @@
 'use client';
 import Link from 'next/link';
-import { ArrowRight, Sparkles, Shield, Zap, Globe2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { motion } from 'framer-motion';
+import { ArrowRight, CheckCircle2, Shield, Zap, Globe2 } from 'lucide-react';
 
 const stats = [
-  { value: '2.4M+', label: 'Translations verified' },
-  { value: '100+', label: 'Languages supported' },
-  { value: '97.3%', label: 'Avg. confidence score' },
+  { value: '100+', label: 'Languages' },
+  { value: '5', label: 'AI validators' },
+  { value: '97%', label: 'Avg. confidence' },
   { value: '99.9%', label: 'Uptime' },
+];
+
+const badges = [
+  { icon: Shield, text: 'On-chain verified' },
+  { icon: Zap, text: 'Sub-90s consensus' },
+  { icon: Globe2, text: '100+ languages' },
 ];
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/50 via-background to-purple-950/30" />
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden pt-16 bg-[#efece4]">
+      {/* Subtle texture circles */}
+      <div className="absolute top-1/3 -left-32 w-[500px] h-[500px] rounded-full bg-purple-100/40 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 -right-32 w-[400px] h-[400px] rounded-full bg-indigo-100/40 blur-3xl pointer-events-none" />
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="space-y-8">
-          <Badge variant="info" className="gap-1.5 px-4 py-1.5 text-sm mx-auto inline-flex">
-            <Sparkles className="h-3.5 w-3.5" />
-            Powered by GenLayer AI Consensus
-          </Badge>
+      <div className="relative max-w-5xl mx-auto px-6 lg:px-8 py-24 text-center space-y-8">
+        {/* Tag */}
+        <div className="inline-flex items-center gap-2 border border-[#d4cfc0] bg-white/60 px-4 py-1.5 rounded-full text-xs font-medium text-muted-foreground">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Powered by GenLayer on-chain AI consensus
+        </div>
 
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-tight">
-            Trustworthy Translations,{' '}
-            <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-              Verified On-Chain
-            </span>
-          </h1>
+        {/* Headline */}
+        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.08] text-foreground">
+          Break Language Barriers<br />
+          <span className="font-serif italic font-normal text-primary">with AI-Powered</span><br />
+          Precision.
+        </h1>
 
-          <p className="max-w-2xl mx-auto text-lg sm:text-xl text-muted-foreground leading-relaxed">
-            Linguara uses decentralized AI consensus to deliver accurate, context-aware translations
-            across 100+ languages — with cryptographic proof of quality on every output.
-          </p>
+        <p className="max-w-2xl mx-auto text-lg text-muted-foreground leading-relaxed">
+          Experience the next generation of global communication. Seamlessly translate documents,
+          conversations, and enterprise content with decentralized AI verification across 100+ languages.
+        </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link href="/auth/register">
-              <Button variant="gradient" size="xl" className="gap-2">
-                Start translating free
-                <ArrowRight className="h-5 w-5" />
-              </Button>
-            </Link>
-            <a href="#how-it-works">
-              <Button variant="outline" size="xl">See how it works</Button>
-            </a>
-          </div>
+        {/* CTAs */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-2">
+          <Link
+            href="/auth/register"
+            className="inline-flex items-center gap-2 bg-foreground text-[#efece4] font-semibold px-8 py-3.5 rounded-full hover:opacity-90 transition-opacity text-sm"
+          >
+            Get Started Free
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          <a
+            href="#how-it-works"
+            className="inline-flex items-center gap-2 border border-[#d4cfc0] bg-white/60 text-foreground font-medium px-8 py-3.5 rounded-full hover:bg-white/80 transition-colors text-sm"
+          >
+            Watch Demo
+          </a>
+        </div>
 
-          <div className="flex flex-wrap gap-6 justify-center pt-4">
-            {[
-              { icon: Shield, text: 'On-chain verified' },
-              { icon: Zap, text: 'Sub-60s consensus' },
-              { icon: Globe2, text: '100+ languages' },
-            ].map(({ icon: Icon, text }) => (
-              <div key={text} className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Icon className="h-4 w-4 text-primary" />
-                {text}
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="mt-20 grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-4xl mx-auto"
-        >
-          {stats.map((s) => (
-            <div key={s.label} className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                {s.value}
-              </div>
-              <div className="text-sm text-muted-foreground mt-1">{s.label}</div>
+        {/* Trust */}
+        <div className="flex flex-wrap gap-6 justify-center pt-2">
+          {badges.map(({ icon: Icon, text }) => (
+            <div key={text} className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Icon className="h-4 w-4 text-primary" />
+              {text}
             </div>
           ))}
-        </motion.div>
+        </div>
 
-        {/* Translation demo preview */}
-        <motion.div
-          initial={{ opacity: 0, y: 60 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.5 }}
-          className="mt-16 max-w-4xl mx-auto"
-        >
-          <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur p-6 shadow-2xl shadow-indigo-500/10">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span className="text-xs text-muted-foreground font-medium">English</span>
-                </div>
-                <div className="rounded-lg bg-muted/50 p-4 text-sm text-left leading-relaxed">
-                  "This agreement shall be governed by and construed in accordance with the laws of the State of California."
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-indigo-500" />
-                  <span className="text-xs text-muted-foreground font-medium">French · Consensus verified</span>
-                </div>
-                <div className="rounded-lg bg-indigo-500/10 border border-indigo-500/20 p-4 text-sm text-left leading-relaxed">
-                  "Le présent accord sera régi et interprété conformément aux lois de l'État de Californie."
-                </div>
-              </div>
+        {/* Social proof */}
+        <p className="text-xs text-muted-foreground">
+          Trusted by <span className="font-semibold text-foreground">10k+ global enterprises</span>
+        </p>
+
+        {/* Stats */}
+        <div className="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-px bg-[#d4cfc0] rounded-2xl overflow-hidden border border-[#d4cfc0]">
+          {stats.map((s) => (
+            <div key={s.label} className="text-center py-8 px-6 bg-[#efece4]">
+              <div className="text-3xl font-bold text-foreground">{s.value}</div>
+              <div className="text-xs text-muted-foreground mt-1 font-medium">{s.label}</div>
             </div>
-            <div className="mt-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-1.5 w-24 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full w-[97%] bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" />
-                </div>
-                <span className="text-xs text-emerald-500 font-semibold">97% confidence</span>
-              </div>
-              <span className="text-xs text-muted-foreground">3 agents · Legal domain · On-chain ✓</span>
+          ))}
+        </div>
+
+        {/* Live demo card */}
+        <div className="mt-12 max-w-3xl mx-auto rounded-2xl border border-[#d4cfc0] bg-white/70 backdrop-blur shadow-lg overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-[#e8e4d8] bg-[#f5f3ee]">
+            <div className="flex gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-red-400" />
+              <span className="w-3 h-3 rounded-full bg-yellow-400" />
+              <span className="w-3 h-3 rounded-full bg-emerald-400" />
+            </div>
+            <span className="text-xs text-muted-foreground font-mono ml-2">Live input · English → French</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[#e8e4d8]">
+            <div className="p-5 text-sm text-left leading-relaxed text-muted-foreground">
+              "This agreement shall be governed by and construed in accordance with the laws of the State of California."
+            </div>
+            <div className="p-5 text-sm text-left leading-relaxed text-foreground bg-purple-50/50">
+              "Le présent accord sera régi et interprété conformément aux lois de l'État de Californie."
             </div>
           </div>
-        </motion.div>
+          <div className="flex items-center justify-between px-5 py-3 border-t border-[#e8e4d8] bg-[#f5f3ee]">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <span className="text-xs font-semibold text-emerald-700">Consensus verified · 97.3%</span>
+            </div>
+            <span className="text-xs text-muted-foreground">Legal domain · 5 validators · On-chain ✓</span>
+          </div>
+        </div>
       </div>
     </section>
   );

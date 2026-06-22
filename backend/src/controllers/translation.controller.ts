@@ -242,3 +242,21 @@ export async function getAuditLog(req: AuthRequest, res: Response) {
     return sendError(res, 'Failed to fetch audit logs', 500);
   }
 }
+
+export async function extractFile(req: AuthRequest, res: Response) {
+  const { base64, filename, mimeType } = req.body;
+  if (!base64 || !filename) return sendError(res, 'base64 and filename required', 400);
+
+  try {
+    const buffer = Buffer.from(base64, 'base64');
+
+    if (mimeType === 'text/plain' || filename.endsWith('.txt')) {
+      const text = buffer.toString('utf-8');
+      return sendSuccess(res, { text, filename }, 'File extracted');
+    }
+
+    return sendError(res, 'PDF and DOCX extraction is not yet supported. Please copy and paste the text directly.', 422);
+  } catch {
+    return sendError(res, 'File extraction failed', 500);
+  }
+}

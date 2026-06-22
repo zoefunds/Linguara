@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { Copy, Check, ExternalLink, Loader2, AlignLeft, Upload, Zap } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Copy, Check, ExternalLink, Loader2, AlignLeft, Upload, Zap, ArrowLeftRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -51,7 +51,7 @@ const STATUS_LABELS: Record<string, string> = {
   SUBMITTING: 'Submitting to GenLayer...',
   PENDING: 'Transaction queued on-chain...',
   PROCESSING: 'AI validators reaching consensus...',
-  COMPLETED: 'On-chain — verified!',
+  COMPLETED: 'Verified on-chain!',
   FAILED: 'Translation failed',
 };
 
@@ -64,8 +64,53 @@ export default function TranslatePage() {
   const [txHash, setTxHash] = useState<string | null>(null);
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [fileLoading, setFileLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isProcessing = status === 'SUBMITTING' || status === 'PENDING' || status === 'PROCESSING';
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ['text/plain', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowed.includes(file.type) && !file.name.endsWith('.txt') && !file.name.endsWith('.pdf') && !file.name.endsWith('.docx')) {
+      toast({ variant: 'destructive', title: 'Unsupported file type', description: 'Please upload a TXT, PDF, or DOCX file.' });
+      return;
+    }
+
+    setFileLoading(true);
+    setFileName(file.name);
+
+    try {
+      if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+        const text = await file.text();
+        setSourceText(text);
+        setMode('text');
+        toast({ title: 'File loaded', description: `${file.name} (${text.length.toLocaleString()} chars)` });
+      } else {
+        // For PDF/DOCX, read as base64 and send to backend for extraction
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const base64 = (ev.target?.result as string)?.split(',')[1];
+          try {
+            const { data } = await translationApi.extractFile({ base64, filename: file.name, mimeType: file.type });
+            setSourceText(data.data?.text || '');
+            setMode('text');
+            toast({ title: 'File extracted', description: `${file.name} ready for translation` });
+          } catch {
+            toast({ variant: 'destructive', title: 'Extraction failed', description: 'Could not extract text from file.' });
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch {
+      toast({ variant: 'destructive', title: 'File read error', description: 'Could not read the file.' });
+    } finally {
+      setFileLoading(false);
+    }
+  };
 
   const handleTranslate = async () => {
     if (!sourceText.trim()) {
@@ -78,17 +123,10 @@ export default function TranslatePage() {
     setTxHash(null);
 
     try {
-      // Step 1: Submit to backend (backend fires GenLayer tx async)
-      const { data } = await translationApi.create({
-        sourceText,
-        targetLanguage: targetLang,
-        domain,
-      });
-
+      const { data } = await translationApi.create({ sourceText, targetLanguage: targetLang, domain });
       const { translationId } = data.data;
       setStatus('PENDING');
 
-      // Step 2: Poll backend for txHash and final result
       const finalResult = await pollBackend(translationId, (s, hash) => {
         setStatus(s as Status);
         if (hash) setTxHash(hash);
@@ -116,41 +154,63 @@ export default function TranslatePage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const targetLangName = LANGUAGES.find(l => l.code === targetLang)?.name || 'Translation';
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Controls */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="flex rounded-lg border border-border overflow-hidden">
-          <button
-            onClick={() => setMode('text')}
-            className={cn('px-4 py-2 text-sm font-medium flex items-center gap-2 transition-colors',
-              mode === 'text' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
-          >
-            <AlignLeft className="h-3.5 w-3.5" /> Text
-          </button>
-          <button
-            onClick={() => setMode('file')}
-            className={cn('px-4 py-2 text-sm font-medium flex items-center gap-2 transition-colors',
-              mode === 'file' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
-          >
-            <Upload className="h-3.5 w-3.5" /> File
-          </button>
+    <div className="max-w-6xl mx-auto space-y-5">
+      {/* Top controls bar */}
+      <div className="flex flex-wrap gap-3 items-center justify-between">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Mode toggle */}
+          <div className="flex rounded-xl border border-[#d4cfc0] bg-white/60 overflow-hidden p-0.5 gap-0.5">
+            <button
+              onClick={() => setMode('text')}
+              className={cn(
+                'px-4 py-1.5 text-sm font-medium flex items-center gap-2 rounded-lg transition-all',
+                mode === 'text' ? 'bg-foreground text-[#efece4] shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <AlignLeft className="h-3.5 w-3.5" /> Text
+            </button>
+            <button
+              onClick={() => { setMode('file'); fileInputRef.current?.click(); }}
+              className={cn(
+                'px-4 py-1.5 text-sm font-medium flex items-center gap-2 rounded-lg transition-all',
+                mode === 'file' ? 'bg-foreground text-[#efece4] shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Upload className="h-3.5 w-3.5" /> File
+            </button>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.pdf,.docx"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          {/* Language selectors */}
+          <Select value={targetLang} onValueChange={setTargetLang}>
+            <SelectTrigger className="w-44 bg-white/60 border-[#d4cfc0] rounded-xl">
+              <SelectValue placeholder="Target language" />
+            </SelectTrigger>
+            <SelectContent className="z-50">
+              {LANGUAGES.map(l => <SelectItem key={l.code} value={l.code}>{l.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          <Select value={domain} onValueChange={setDomain}>
+            <SelectTrigger className="w-36 bg-white/60 border-[#d4cfc0] rounded-xl">
+              <SelectValue placeholder="Domain" />
+            </SelectTrigger>
+            <SelectContent className="z-50">
+              {DOMAINS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
 
-        <Select value={targetLang} onValueChange={setTargetLang}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Target language" /></SelectTrigger>
-          <SelectContent>
-            {LANGUAGES.map(l => <SelectItem key={l.code} value={l.code}>{l.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-
-        <Select value={domain} onValueChange={setDomain}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="Domain" /></SelectTrigger>
-          <SelectContent>
-            {DOMAINS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-
+        {/* Status badge */}
         {status && (
           <Badge
             variant={status === 'COMPLETED' ? 'success' : status === 'FAILED' ? 'destructive' : 'info'}
@@ -162,19 +222,31 @@ export default function TranslatePage() {
         )}
       </div>
 
-      {/* Translation area */}
+      {/* File indicator */}
+      {fileName && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-white/60 border border-[#d4cfc0] rounded-xl px-4 py-2">
+          <Upload className="h-4 w-4 text-primary" />
+          <span className="font-medium text-foreground">{fileName}</span>
+          {fileLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          <button onClick={() => { setFileName(null); setSourceText(''); }} className="ml-auto text-muted-foreground hover:text-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Translation panes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="border-border/50">
+        <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">Source text</CardTitle>
-              <span className="text-xs text-muted-foreground">{sourceText.length}/50,000</span>
+              <span className="text-xs text-muted-foreground">{sourceText.length.toLocaleString()} / 50,000</span>
             </div>
           </CardHeader>
           <CardContent>
             <textarea
               className="w-full h-56 bg-transparent text-sm resize-none outline-none placeholder:text-muted-foreground"
-              placeholder="Enter text to translate... (auto-detect language)"
+              placeholder="Enter text to translate… (language auto-detected)"
               value={sourceText}
               onChange={e => setSourceText(e.target.value)}
               maxLength={50000}
@@ -182,12 +254,10 @@ export default function TranslatePage() {
           </CardContent>
         </Card>
 
-        <Card className={cn('border-border/50', result && 'border-primary/30')}>
+        <Card className={cn('border-[#d4cfc0] bg-white/60 rounded-2xl', result && 'border-primary/30')}>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {LANGUAGES.find(l => l.code === targetLang)?.name || 'Translation'}
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{targetLangName}</CardTitle>
               {result && (
                 <div className="flex items-center gap-2">
                   <Badge variant="success" className="text-xs">Consensus verified</Badge>
@@ -225,7 +295,7 @@ export default function TranslatePage() {
           variant="gradient"
           size="lg"
           disabled={isProcessing || !sourceText.trim()}
-          className="gap-2"
+          className="gap-2 rounded-full"
         >
           {isProcessing
             ? <><Loader2 className="h-4 w-4 animate-spin" />Processing on-chain...</>
@@ -234,7 +304,7 @@ export default function TranslatePage() {
 
         {txHash && (
           <a
-            href={`https://genlayer-explorer.vercel.app/transactions/${txHash}`}
+            href={`https://explorer-studio.genlayer.com/transactions/${txHash}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors font-mono"
@@ -253,7 +323,7 @@ export default function TranslatePage() {
             { label: 'Semantic Accuracy', score: result.semanticScore },
             { label: 'Tone & Style', score: result.toneScore },
           ].map(({ label, score }) => (
-            <Card key={label} className="border-border/50 p-4">
+            <Card key={label} className="border-[#d4cfc0] bg-white/60 rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-muted-foreground font-medium">{label}</span>
                 <span className={cn('text-sm font-bold', getConfidenceColor(score))}>{score.toFixed(1)}%</span>
@@ -266,7 +336,7 @@ export default function TranslatePage() {
 
       {/* Agent breakdown */}
       {result?.agents && result.agents.length > 0 && (
-        <Card className="border-border/50">
+        <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl">
           <CardHeader>
             <CardTitle className="text-sm">Validator Agent Breakdown</CardTitle>
           </CardHeader>
@@ -276,8 +346,8 @@ export default function TranslatePage() {
                 <div
                   key={agent.agentId}
                   className={cn(
-                    'p-3 rounded-lg border text-sm',
-                    agent.isConsensus ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-border/50'
+                    'p-3 rounded-xl border text-sm',
+                    agent.isConsensus ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-[#d4cfc0]'
                   )}
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -330,7 +400,7 @@ async function pollBackend(
 
       if (t.status === 'FAILED') return null;
     } catch {
-      // Network error, keep polling
+      // Network error — keep polling
     }
   }
 

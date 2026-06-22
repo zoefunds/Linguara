@@ -71,4 +71,6 @@ export const translationApi = {
     api.get(`/translations?page=${page}&limit=${limit}`),
   audit: (page = 1, limit = 50) =>
     api.get(`/translations/audit?page=${page}&limit=${limit}`),
+  extractFile: (data: { base64: string; filename: string; mimeType: string }) =>
+    api.post('/translations/extract-file', data),
 };
