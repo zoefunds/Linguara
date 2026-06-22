@@ -4,6 +4,7 @@ import { AuthRequest } from '../middleware/auth';
 import { sendSuccess, sendError, sendPaginated } from '../utils/response';
 import { sendTranslationTx, pollUntilFinalized } from '../services/genLayer.service';
 import { sendTranslationCompleteEmail } from '../services/email.service';
+import { decryptPrivateKey } from '../utils/wallet';
 import { logger } from '../config/logger';
 
 export async function createTranslation(req: AuthRequest, res: Response) {
@@ -15,10 +16,26 @@ export async function createTranslation(req: AuthRequest, res: Response) {
   try {
     const wallet = await prisma.wallet.findUnique({
       where: { userId: req.user!.userId },
-      select: { address: true },
     });
 
-    const senderAddress = wallet?.address || '0x0000000000000000000000000000000000000001';
+    if (!wallet) {
+      return sendError(res, 'No wallet found for user. Please re-register.', 400);
+    }
+
+    let userPrivateKey: string;
+    try {
+      userPrivateKey = decryptPrivateKey(
+        wallet.encryptedPrivateKey,
+        wallet.iv,
+        wallet.authTag,
+        req.user!.userId
+      );
+    } catch (err) {
+      logger.error('Failed to decrypt user wallet', { userId: req.user!.userId });
+      return sendError(res, 'Wallet decryption failed', 500);
+    }
+
+    const senderAddress = wallet.address;
 
     const translation = await prisma.translation.create({
       data: {
@@ -44,7 +61,7 @@ export async function createTranslation(req: AuthRequest, res: Response) {
     });
 
     // Fire GenLayer call fully async after response is sent
-    submitToGenLayer(translation.id, req.user!.userId, senderAddress, {
+    submitToGenLayer(translation.id, req.user!.userId, userPrivateKey, senderAddress, {
       sourceText,
       targetLanguage,
       sourceLanguage: sourceLanguage || 'auto',
@@ -59,6 +76,7 @@ export async function createTranslation(req: AuthRequest, res: Response) {
 async function submitToGenLayer(
   translationId: string,
   userId: string,
+  userPrivateKey: string,
   senderAddress: string,
   params: { sourceText: string; targetLanguage: string; sourceLanguage: string; domain: string }
 ) {
@@ -69,7 +87,7 @@ async function submitToGenLayer(
     });
 
     const txHash = await sendTranslationTx(
-      senderAddress,
+      userPrivateKey,
       params.sourceText,
       params.targetLanguage,
       params.sourceLanguage,

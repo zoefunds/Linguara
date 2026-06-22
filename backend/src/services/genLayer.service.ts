@@ -1,16 +1,6 @@
 import { config } from '../config/env';
 import { logger } from '../config/logger';
 
-export type GenLayerStatus =
-  | 'PENDING'
-  | 'PROPOSING'
-  | 'COMMITTING'
-  | 'REVEALING'
-  | 'ACCEPTED'
-  | 'FINALIZED'
-  | 'UNDETERMINED'
-  | 'CANCELED';
-
 export interface TranslationConsensusResult {
   finalTranslation: string;
   confidenceScore: number;
@@ -29,34 +19,39 @@ export interface TranslationConsensusResult {
   }>;
 }
 
-const RPC = config.genLayer.rpcUrl;
-const CONTRACT = config.genLayer.contractAddress;
+// Dynamic ESM import that survives CJS compilation
+const dynamicImport = new Function('specifier', 'return import(specifier)') as (s: string) => Promise<any>;
 
-async function rpc(method: string, params: unknown[]): Promise<unknown> {
-  const res = await fetch(RPC, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', method, params, id: Date.now() }),
-  });
+let _studionet: any = null;
 
-  if (!res.ok) throw new Error(`GenLayer RPC HTTP ${res.status}`);
-  const json = await res.json() as { error?: { message: string }; result?: unknown };
-  if (json.error) throw new Error(`GenLayer RPC error: ${json.error.message}`);
-  return json.result;
+async function loadStudionet() {
+  if (!_studionet) {
+    const chains = await dynamicImport('genlayer-js/chains');
+    _studionet = chains.studionet;
+  }
+  return _studionet;
 }
+
+async function getGLClient(privateKey: string) {
+  const chain = await loadStudionet();
+  const gl = await dynamicImport('genlayer-js');
+  const account = gl.createAccount(privateKey as `0x${string}`);
+  return gl.createClient({ chain, account });
+}
+
+async function getReadOnlyClient() {
+  const chain = await loadStudionet();
+  const gl = await dynamicImport('genlayer-js');
+  return gl.createClient({ chain });
+}
+
+const CONTRACT = config.genLayer.contractAddress as `0x${string}`;
 
 /**
- * Encode method call as a hex string the way GenLayer Studio expects.
- * Format: 0x + hex(JSON.stringify({method, args}))
+ * Submit a translation write transaction using the user's wallet private key.
  */
-function encodeCalldata(method: string, args: unknown[]): string {
-  // GenLayer requires {method, args, kwargs} — all three fields
-  const payload = JSON.stringify({ method, args, kwargs: {} });
-  return '0x' + Buffer.from(payload, 'utf8').toString('hex');
-}
-
 export async function sendTranslationTx(
-  senderAddress: string,
+  userPrivateKey: string,
   sourceText: string,
   targetLanguage: string,
   sourceLanguage: string,
@@ -64,63 +59,71 @@ export async function sendTranslationTx(
 ): Promise<string> {
   if (!CONTRACT) throw new Error('GENLAYER_CONTRACT_ADDRESS not configured');
 
-  const data = encodeCalldata('translate_text', [
-    sourceText,
-    targetLanguage,
-    sourceLanguage || 'auto',
-    domain || 'general',
-    '', // context_hint
-  ]);
+  const client = await getGLClient(userPrivateKey);
 
-  const txHash = await rpc('gen_sendTransaction', [{
-    from: senderAddress,
-    to: CONTRACT,
-    value: '0x0',
-    data,
-  }]);
+  const txHash = await client.writeContract({
+    address: CONTRACT,
+    functionName: 'translate_text',
+    args: [sourceText, targetLanguage, sourceLanguage || 'auto', domain || 'general', ''],
+    value: 0n,
+  });
 
-  if (typeof txHash !== 'string') {
-    throw new Error(`Unexpected txHash type: ${JSON.stringify(txHash)}`);
-  }
-
-  logger.info('GenLayer tx submitted', { txHash, senderAddress, targetLanguage });
+  logger.info('GenLayer writeContract submitted', { txHash });
   return txHash;
 }
 
-export async function getTransactionStatus(txHash: string): Promise<{
-  status: GenLayerStatus;
-  result?: unknown;
-  consensusData?: Record<string, unknown>;
-}> {
-  const raw = await rpc('gen_getTransactionByHash', [txHash]) as Record<string, unknown> | null;
-  if (!raw) return { status: 'PENDING' };
-
-  const status = (raw.status as GenLayerStatus) || 'PENDING';
-  const consensusData = raw.consensus_data as Record<string, unknown> | undefined;
-
-  return { status, result: raw.result, consensusData };
+/**
+ * Read contract state (view function) without requiring a wallet.
+ */
+export async function readContract(functionName: string, args: unknown[] = []) {
+  const client = await getReadOnlyClient();
+  return client.readContract({
+    address: CONTRACT,
+    functionName,
+    args,
+  });
 }
 
+/**
+ * Get transaction status from GenLayer.
+ */
+export async function getTransactionStatus(txHash: string) {
+  const client = await getReadOnlyClient();
+
+  try {
+    const receipt = await client.getTransaction({ hash: txHash as `0x${string}` });
+    return receipt;
+  } catch (e) {
+    logger.warn('getTransactionStatus failed', { txHash, err: String(e) });
+    return null;
+  }
+}
+
+/**
+ * Poll until the transaction reaches a terminal state.
+ */
 export async function pollUntilFinalized(txHash: string): Promise<TranslationConsensusResult> {
+  const client = await getReadOnlyClient();
   const maxAttempts = 60;
-  const interval = 4000;
 
   for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(r => setTimeout(r, interval));
+    await new Promise(r => setTimeout(r, 4000));
 
     try {
-      const { status, consensusData } = await getTransactionStatus(txHash);
+      const receipt = await client.getTransaction({ hash: txHash as `0x${string}` });
+      const status = receipt?.status;
+
       logger.info('GenLayer poll', { txHash, status, attempt: i + 1 });
 
       if (status === 'UNDETERMINED') {
-        throw new Error('GenLayer consensus undetermined — translation could not reach agreement');
+        throw new Error('GenLayer consensus undetermined');
       }
       if (status === 'CANCELED') {
-        throw new Error('GenLayer transaction was canceled');
+        throw new Error('GenLayer transaction canceled');
       }
 
       if (status === 'FINALIZED' || status === 'ACCEPTED') {
-        return parseConsensusData(txHash, consensusData);
+        return parseResult(txHash, receipt);
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -129,85 +132,51 @@ export async function pollUntilFinalized(txHash: string): Promise<TranslationCon
     }
   }
 
-  throw new Error('GenLayer transaction polling timed out after 4 minutes');
+  throw new Error('GenLayer transaction timed out after 4 minutes');
 }
 
-function parseConsensusData(
-  txHash: string,
-  consensusData?: Record<string, unknown>
-): TranslationConsensusResult {
-  if (!consensusData) {
-    return emptyResult(txHash);
-  }
+function parseResult(txHash: string, receipt: any): TranslationConsensusResult {
+  // The receipt from genlayer-js contains the decoded result
+  const finalTranslation = typeof receipt?.result === 'string'
+    ? receipt.result.trim()
+    : '';
 
-  const final = consensusData.final as Record<string, unknown> | undefined;
-  const validators = (consensusData.validators as Array<Record<string, unknown>>) || [];
+  const consensusData = receipt?.consensus_data || receipt?.consensusData;
+  const validators = consensusData?.validators || [];
 
-  // The result from translate_text is the translated string
-  const finalResult = final?.result as string | undefined;
-  const finalTranslation = typeof finalResult === 'string'
-    ? finalResult.trim()
-    : extractStringResult(final);
+  const agreeCount = validators.filter((v: any) => v.vote === 'agree').length;
+  const total = validators.length || 1;
+  const confidenceScore = Math.min(100, (agreeCount / total) * 100) || 80;
 
-  // Build per-agent breakdown from validators
-  const agents = validators.map((v, i) => {
-    const vResult = v.result as string | undefined;
-    const translation = typeof vResult === 'string' ? vResult.trim() : finalTranslation;
-    const confidence = typeof v.confidence === 'number' ? v.confidence * 100
-      : (v.vote === 'agree' ? 85 : 60);
-
+  const agents = validators.map((v: any, i: number) => {
+    const translation = typeof v.result === 'string' ? v.result.trim() : finalTranslation;
+    const confidence = v.vote === 'agree' ? confidenceScore : confidenceScore * 0.6;
     return {
       agentId: i + 1,
       translation,
       confidence,
-      semantic: confidence * 0.95,
-      tone: confidence * 0.9,
+      semantic: confidence * 0.96,
+      tone: confidence * 0.91,
       cultural: confidence * 0.88,
-      isConsensus: v.vote === 'agree' || i === 0,
+      isConsensus: v.vote === 'agree',
     };
   });
 
-  // Derive confidence from validator agreement ratio
-  const agreeCount = validators.filter(v => v.vote === 'agree').length;
-  const totalValidators = validators.length || 1;
-  const confidenceScore = Math.min(100, (agreeCount / totalValidators) * 100);
-
   return {
     finalTranslation,
-    confidenceScore: confidenceScore || 80,
-    semanticScore: confidenceScore * 0.95 || 76,
-    toneScore: confidenceScore * 0.90 || 72,
-    culturalScore: confidenceScore * 0.88 || 70,
+    confidenceScore,
+    semanticScore: confidenceScore * 0.96,
+    toneScore: confidenceScore * 0.91,
+    culturalScore: confidenceScore * 0.88,
     txHash,
     agents: agents.length > 0 ? agents : [{
       agentId: 1,
       translation: finalTranslation,
-      confidence: confidenceScore || 80,
-      semantic: 76,
-      tone: 72,
-      cultural: 70,
+      confidence: confidenceScore,
+      semantic: confidenceScore * 0.96,
+      tone: confidenceScore * 0.91,
+      cultural: confidenceScore * 0.88,
       isConsensus: true,
     }],
-  };
-}
-
-function extractStringResult(obj?: Record<string, unknown>): string {
-  if (!obj) return '';
-  // Try common result field names
-  for (const key of ['result', 'output', 'translation', 'text', 'value']) {
-    if (typeof obj[key] === 'string') return (obj[key] as string).trim();
-  }
-  return JSON.stringify(obj);
-}
-
-function emptyResult(txHash: string): TranslationConsensusResult {
-  return {
-    finalTranslation: '',
-    confidenceScore: 0,
-    semanticScore: 0,
-    toneScore: 0,
-    culturalScore: 0,
-    txHash,
-    agents: [],
   };
 }
