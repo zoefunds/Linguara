@@ -331,9 +331,10 @@ class LinguaraTranslation(gl.Contract):
         tgt_label = SUPPORTED_LANGUAGES.get(target_language, target_language)
         domain_instruction = DOMAIN_INSTRUCTIONS.get(domain, DOMAIN_INSTRUCTIONS["general"])
 
-        # ── Step 1: Single LLM translation call ─────────────────────────────
-        # Each GenLayer validator runs this independently — that IS the multi-expert layer.
-        translation_prompt = (
+        # ── Step 1: Single LLM translation call per validator ───────────────
+        # gl.eq_principle_prompt_non_comparative runs an LLM call and uses
+        # GenLayer's consensus to verify validators agree on the result.
+        final_translation = gl.eq_principle_prompt_non_comparative(
             f"You are a professional translator. Translate the following text from {src_label} to {tgt_label}.\n\n"
             f"Domain: {domain}\n"
             f"Instructions: {domain_instruction}\n\n"
@@ -345,28 +346,8 @@ class LinguaraTranslation(gl.Contract):
             f"Text to translate:\n{source_text}"
         )
 
-        translation_result = gl.exec_prompt(translation_prompt)
-
-        final_translation = translation_result.strip()
-        if not final_translation:
+        if not final_translation or not final_translation.strip():
             raise gl.vm.UserError("LLM returned empty translation")
-
-        # ── Step 2: Lenient equivalence check ───────────────────────────────
-        # This is what GenLayer uses to verify validator agreement.
-        # Criteria: the translation conveys the same meaning as the source text.
-        # Lenient = avoids undetermined consensus status.
-        def equivalence_check(t: str) -> bool:
-            return (
-                len(t.strip()) > 0
-                and len(t.strip()) >= len(source_text.strip()) * 0.3
-            )
-
-        gl.eq_principle_prompt_comparative(
-            final_translation,
-            lambda t: equivalence_check(t),
-            "The translation conveys the same core meaning and information as the source text, "
-            "even if wording differs between validators.",
-        )
 
         # ── Step 3: Persist result ───────────────────────────────────────────
         result_blob = {
@@ -420,7 +401,7 @@ class LinguaraTranslation(gl.Contract):
             "Nothing else.\n\nText:\n" + safe_sample
         )
 
-        detected = gl.exec_prompt(detect_prompt).strip().lower()
+        detected = gl.eq_principle_prompt_non_comparative(detect_prompt).strip().lower()
 
         result = {
             "detected_language": detected,
