@@ -50,7 +50,8 @@ async function rpc(method: string, params: unknown[]): Promise<unknown> {
  * Format: 0x + hex(JSON.stringify({method, args}))
  */
 function encodeCalldata(method: string, args: unknown[]): string {
-  const payload = JSON.stringify({ method, args });
+  // GenLayer requires {method, args, kwargs} — all three fields
+  const payload = JSON.stringify({ method, args, kwargs: {} });
   return '0x' + Buffer.from(payload, 'utf8').toString('hex');
 }
 

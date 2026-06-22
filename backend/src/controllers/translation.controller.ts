@@ -13,7 +13,6 @@ export async function createTranslation(req: AuthRequest, res: Response) {
   if (!targetLanguage) return sendError(res, 'targetLanguage is required', 400);
 
   try {
-    // Get user's wallet address to use as the GenLayer sender
     const wallet = await prisma.wallet.findUnique({
       where: { userId: req.user!.userId },
       select: { address: true },
@@ -21,7 +20,6 @@ export async function createTranslation(req: AuthRequest, res: Response) {
 
     const senderAddress = wallet?.address || '0x0000000000000000000000000000000000000001';
 
-    // Create DB record first
     const translation = await prisma.translation.create({
       data: {
         userId: req.user!.userId,
@@ -34,111 +32,75 @@ export async function createTranslation(req: AuthRequest, res: Response) {
       },
     });
 
-    // Submit to GenLayer — get txHash immediately
-    let txHash: string | null = null;
-    try {
-      txHash = await sendTranslationTx(
-        senderAddress,
-        sourceText,
-        targetLanguage,
-        sourceLanguage || 'auto',
-        domain || 'general'
-      );
-
-      // Save txHash so frontend can poll GenLayer directly
-      await prisma.translation.update({
-        where: { id: translation.id },
-        data: { contractTxHash: txHash, status: 'PROCESSING' },
-      });
-    } catch (txErr) {
-      logger.error('GenLayer tx submission failed', { err: txErr, translationId: translation.id });
-      await prisma.translation.update({
-        where: { id: translation.id },
-        data: { status: 'FAILED' },
-      });
-      return sendError(res, 'Failed to submit translation to GenLayer', 502);
-    }
-
-    await prisma.auditLog.create({
+    // Respond immediately — never block on GenLayer
+    res.status(202).json({
+      success: true,
       data: {
         translationId: translation.id,
-        userId: req.user!.userId,
-        eventType: 'TRANSLATION_SUBMITTED_ONCHAIN',
-        actor: req.user!.userId,
-        payload: { targetLanguage, domain, txHash, senderAddress },
-        onChainRef: txHash,
+        txHash: null,
+        status: 'PENDING',
+        senderAddress,
       },
     });
 
-    // Poll for result in background
-    pollAndSaveResult(translation.id, req.user!.userId, txHash).catch(err =>
-      logger.error('Translation poll error', { err, translationId: translation.id })
-    );
-
-    // Return immediately with txHash so frontend can also poll GenLayer
-    return sendSuccess(res, {
-      translationId: translation.id,
-      txHash,
-      status: 'PROCESSING',
-      senderAddress,
-    }, 202);
+    // Fire GenLayer call fully async after response is sent
+    submitToGenLayer(translation.id, req.user!.userId, senderAddress, {
+      sourceText,
+      targetLanguage,
+      sourceLanguage: sourceLanguage || 'auto',
+      domain: domain || 'general',
+    });
   } catch (err) {
     logger.error('Create translation error', { err });
-    return sendError(res, 'Failed to create translation', 500);
+    if (!res.headersSent) return sendError(res, 'Failed to create translation', 500);
   }
 }
 
-async function pollAndSaveResult(translationId: string, userId: string, txHash: string) {
+async function submitToGenLayer(
+  translationId: string,
+  userId: string,
+  senderAddress: string,
+  params: { sourceText: string; targetLanguage: string; sourceLanguage: string; domain: string }
+) {
   try {
-    const result = await pollUntilFinalized(txHash);
+    await prisma.translation.update({
+      where: { id: translationId },
+      data: { status: 'PROCESSING' },
+    });
 
-    for (const agent of result.agents) {
-      await prisma.translationResult.create({
-        data: {
-          translationId,
-          agentId: agent.agentId,
-          translatedText: agent.translation,
-          confidenceScore: agent.confidence,
-          semanticScore: agent.semantic,
-          toneScore: agent.tone,
-          culturalScore: agent.cultural,
-          isConsensus: agent.isConsensus,
-        },
-      });
-    }
+    const txHash = await sendTranslationTx(
+      senderAddress,
+      params.sourceText,
+      params.targetLanguage,
+      params.sourceLanguage,
+      params.domain
+    );
+
+    logger.info('GenLayer tx submitted', { txHash, translationId });
 
     await prisma.translation.update({
       where: { id: translationId },
-      data: {
-        status: 'COMPLETED',
-        finalTranslation: result.finalTranslation,
-        confidenceScore: result.confidenceScore,
-        contractTxHash: result.txHash,
-        completedAt: new Date(),
-      },
+      data: { contractTxHash: txHash, status: 'PROCESSING' },
     });
 
     await prisma.auditLog.create({
       data: {
         translationId,
         userId,
-        eventType: 'TRANSLATION_COMPLETED',
-        actor: 'system',
-        payload: { confidenceScore: result.confidenceScore, txHash: result.txHash },
-        onChainRef: result.txHash,
+        eventType: 'TRANSLATION_SUBMITTED_ONCHAIN',
+        actor: userId,
+        payload: { txHash, senderAddress, ...params },
+        onChainRef: txHash,
       },
     });
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (user) {
-      await sendTranslationCompleteEmail(user.email, user.fullName, translationId, result.confidenceScore);
-    }
+    await pollAndSaveResult(translationId, userId, txHash);
   } catch (err) {
-    logger.error('pollAndSaveResult failed', { err, translationId });
+    logger.error('submitToGenLayer failed', { err, translationId });
     await prisma.translation.update({
       where: { id: translationId },
       data: { status: 'FAILED' },
-    });
+    }).catch(() => {});
     await prisma.auditLog.create({
       data: {
         translationId,
@@ -147,7 +109,54 @@ async function pollAndSaveResult(translationId: string, userId: string, txHash: 
         actor: 'system',
         payload: { error: String(err) },
       },
+    }).catch(() => {});
+  }
+}
+
+async function pollAndSaveResult(translationId: string, userId: string, txHash: string) {
+  const result = await pollUntilFinalized(txHash);
+
+  for (const agent of result.agents) {
+    await prisma.translationResult.create({
+      data: {
+        translationId,
+        agentId: agent.agentId,
+        translatedText: agent.translation,
+        confidenceScore: agent.confidence,
+        semanticScore: agent.semantic,
+        toneScore: agent.tone,
+        culturalScore: agent.cultural,
+        isConsensus: agent.isConsensus,
+      },
     });
+  }
+
+  await prisma.translation.update({
+    where: { id: translationId },
+    data: {
+      status: 'COMPLETED',
+      finalTranslation: result.finalTranslation,
+      confidenceScore: result.confidenceScore,
+      contractTxHash: result.txHash,
+      completedAt: new Date(),
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      translationId,
+      userId,
+      eventType: 'TRANSLATION_COMPLETED',
+      actor: 'system',
+      payload: { confidenceScore: result.confidenceScore, txHash: result.txHash },
+      onChainRef: result.txHash,
+    },
+  });
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (user) {
+    await sendTranslationCompleteEmail(user.email, user.fullName, translationId, result.confidenceScore)
+      .catch(() => {});
   }
 }
 
