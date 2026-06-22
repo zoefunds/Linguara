@@ -88,10 +88,12 @@ async function submitToGenLayer(
 
     const txHash = await sendTranslationTx(
       userPrivateKey,
+      translationId,
       params.sourceText,
-      params.targetLanguage,
       params.sourceLanguage,
-      params.domain
+      params.targetLanguage,
+      params.domain,
+      senderAddress
     );
 
     logger.info('GenLayer tx submitted', { txHash, translationId });

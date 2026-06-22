@@ -52,19 +52,22 @@ const CONTRACT = config.genLayer.contractAddress as `0x${string}`;
  */
 export async function sendTranslationTx(
   userPrivateKey: string,
+  translationId: string,
   sourceText: string,
-  targetLanguage: string,
   sourceLanguage: string,
-  domain: string
+  targetLanguage: string,
+  domain: string,
+  senderAddress: string
 ): Promise<string> {
   if (!CONTRACT) throw new Error('GENLAYER_CONTRACT_ADDRESS not configured');
 
   const client = await getGLClient(userPrivateKey);
 
+  // Contract signature: translate_text(translation_id, source_text, source_language, target_language, domain, requestor_address)
   const txHash = await client.writeContract({
     address: CONTRACT,
     functionName: 'translate_text',
-    args: [sourceText, targetLanguage, sourceLanguage || 'auto', domain || 'general', ''],
+    args: [translationId, sourceText, sourceLanguage || 'auto', targetLanguage, domain || 'general', senderAddress],
     value: 0n,
   });
 
