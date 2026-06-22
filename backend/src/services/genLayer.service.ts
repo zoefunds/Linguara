@@ -346,11 +346,18 @@ function buildResult(
 
 function stripQuotes(s: string): string {
   const trimmed = s.trim();
+  let result = trimmed;
   if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
       (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
-    return trimmed.slice(1, -1);
+    result = trimmed.slice(1, -1);
   }
-  return trimmed;
+  // Unescape JSON-encoded escape sequences that GenLayer stores in payload.readable
+  return result
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\r/g, '')
+    .replace(/\\\\/g, '\\')
+    .replace(/\\"/g, '"');
 }
 
 function clamp(v: number, lo = 0, hi = 100): number {

@@ -206,7 +206,7 @@ export default function TranslatePage() {
                 <p className="text-xs opacity-60">AI validators are reaching on-chain consensus</p>
               </div>
             ) : result ? (
-              <div className="h-56 overflow-auto text-sm leading-relaxed">
+              <div className="h-56 overflow-auto text-sm leading-relaxed whitespace-pre-wrap">
                 {result.finalTranslation}
               </div>
             ) : (
