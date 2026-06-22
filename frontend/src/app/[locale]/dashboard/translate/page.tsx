@@ -10,32 +10,6 @@ import { translationApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { cn, getConfidenceColor, getConfidenceBg } from '@/lib/utils';
 
-const GENLAYER_RPC = 'https://studio.genlayer.com/api';
-
-// GenLayer returns numeric status codes
-const STATUS_NUMBER_TO_NAME: Record<string, string> = {
-  '0': 'UNINITIALIZED', '1': 'PENDING', '2': 'PROPOSING', '3': 'COMMITTING',
-  '4': 'REVEALING', '5': 'ACCEPTED', '6': 'UNDETERMINED', '7': 'FINALIZED',
-  '8': 'CANCELED', '9': 'APPEAL_REVEALING', '10': 'APPEAL_COMMITTING',
-  '11': 'READY_TO_FINALIZE', '12': 'VALIDATORS_TIMEOUT', '13': 'LEADER_TIMEOUT',
-};
-
-const TERMINAL_STATUSES = ['FINALIZED', 'ACCEPTED', 'UNDETERMINED', 'CANCELED'];
-
-const STATUS_LABELS: Record<string, string> = {
-  PENDING: 'Submitting to GenLayer...',
-  PROPOSING: 'AI agents proposing translations...',
-  COMMITTING: 'Validators committing votes...',
-  REVEALING: 'Revealing consensus result...',
-  ACCEPTED: 'Consensus reached — finalizing...',
-  FINALIZED: 'On-chain — verified!',
-  UNDETERMINED: 'Consensus undetermined',
-  CANCELED: 'Transaction canceled',
-  READY_TO_FINALIZE: 'Ready to finalize...',
-  VALIDATORS_TIMEOUT: 'Validators timed out',
-  LEADER_TIMEOUT: 'Leader timed out',
-};
-
 const LANGUAGES = [
   { code: 'en', name: 'English' }, { code: 'fr', name: 'French' },
   { code: 'es', name: 'Spanish' }, { code: 'de', name: 'German' },
@@ -56,7 +30,7 @@ const DOMAINS = [
   { value: 'government', label: 'Government' },
 ];
 
-type ChainStatus = keyof typeof STATUS_LABELS;
+type Status = 'SUBMITTING' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | null;
 
 interface TranslationResult {
   translationId: string;
@@ -67,109 +41,31 @@ interface TranslationResult {
   txHash: string;
   agents?: Array<{
     agentId: number;
-    translation: string;
-    confidence: number;
+    translatedText: string;
+    confidenceScore: number;
     isConsensus: boolean;
   }>;
 }
 
-async function genLayerRpc(method: string, params: unknown[]): Promise<unknown> {
-  const res = await fetch(GENLAYER_RPC, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', method, params, id: Date.now() }),
-  });
-  const json = await res.json() as { error?: { message: string }; result?: unknown };
-  if (json.error) throw new Error(json.error.message);
-  return json.result;
-}
-
-async function pollGenLayerTx(
-  txHash: string,
-  onStatus: (s: ChainStatus) => void
-): Promise<{ finalTranslation: string; confidenceScore: number; semanticScore: number; toneScore: number; agents: TranslationResult['agents'] }> {
-  const maxAttempts = 80;
-
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(r => setTimeout(r, 3500));
-
-    try {
-      const raw = await genLayerRpc('gen_getTransactionByHash', [txHash]) as Record<string, unknown> | null;
-      if (!raw) continue;
-
-      const rawStatus = String(raw.status);
-      const status = (STATUS_NUMBER_TO_NAME[rawStatus] || rawStatus) as ChainStatus;
-      onStatus(status);
-
-      if (status === 'UNDETERMINED') throw new Error('Consensus could not be reached — please retry');
-      if (status === 'CANCELED') throw new Error('Transaction was canceled on-chain');
-
-      if (status === 'FINALIZED' || status === 'ACCEPTED') {
-        return extractResult(raw.consensus_data as Record<string, unknown> | undefined);
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes('Consensus') || msg.includes('canceled')) throw e;
-    }
-  }
-
-  throw new Error('Timed out waiting for on-chain finalization (>4 min)');
-}
-
-function extractResult(consensusData?: Record<string, unknown>) {
-  // Extract translation from leader_receipt eq_outputs
-  let finalTranslation = '';
-  const leaderReceipts = (consensusData?.leader_receipt as any[]) || [];
-  if (leaderReceipts.length > 0) {
-    const eqOutputs = leaderReceipts[0]?.eq_outputs || {};
-    const firstOutput = eqOutputs['0'] || eqOutputs[0];
-    if (firstOutput?.payload?.readable) {
-      finalTranslation = stripQuotes(firstOutput.payload.readable);
-    }
-  }
-
-  // Derive confidence from votes
-  const votes = (consensusData?.votes || {}) as Record<string, string>;
-  const voteValues = Object.values(votes);
-  const agreeCount = voteValues.filter(v => v === 'agree').length;
-  const total = voteValues.length || 1;
-  const confidenceScore = Math.min(100, (agreeCount / total) * 100) || 82;
-
-  const agents = Object.entries(votes).map(([, vote], i) => ({
-    agentId: i + 1,
-    translation: finalTranslation,
-    confidence: vote === 'agree' ? confidenceScore : confidenceScore * 0.6,
-    isConsensus: vote === 'agree',
-  }));
-
-  return {
-    finalTranslation,
-    confidenceScore,
-    semanticScore: confidenceScore * 0.96,
-    toneScore: confidenceScore * 0.91,
-    agents,
-  };
-}
-
-function stripQuotes(s: string): string {
-  const t = s.trim();
-  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'")))
-    return t.slice(1, -1);
-  return t;
-}
+const STATUS_LABELS: Record<string, string> = {
+  SUBMITTING: 'Submitting to GenLayer...',
+  PENDING: 'Transaction queued on-chain...',
+  PROCESSING: 'AI validators reaching consensus...',
+  COMPLETED: 'On-chain — verified!',
+  FAILED: 'Translation failed',
+};
 
 export default function TranslatePage() {
   const [mode, setMode] = useState<'text' | 'file'>('text');
   const [sourceText, setSourceText] = useState('');
   const [targetLang, setTargetLang] = useState('fr');
   const [domain, setDomain] = useState('general');
-  const [submitting, setSubmitting] = useState(false);
-  const [chainStatus, setChainStatus] = useState<ChainStatus | null>(null);
+  const [status, setStatus] = useState<Status>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const isProcessing = submitting || (chainStatus !== null && !TERMINAL_STATUSES.includes(chainStatus));
+  const isProcessing = status === 'SUBMITTING' || status === 'PENDING' || status === 'PROCESSING';
 
   const handleTranslate = async () => {
     if (!sourceText.trim()) {
@@ -177,13 +73,12 @@ export default function TranslatePage() {
       return;
     }
 
-    setSubmitting(true);
+    setStatus('SUBMITTING');
     setResult(null);
-    setChainStatus(null);
     setTxHash(null);
 
     try {
-      // Step 1: Backend creates record and fires GenLayer async — responds immediately
+      // Step 1: Submit to backend (backend fires GenLayer tx async)
       const { data } = await translationApi.create({
         sourceText,
         targetLanguage: targetLang,
@@ -191,57 +86,26 @@ export default function TranslatePage() {
       });
 
       const { translationId } = data.data;
-      setChainStatus('PENDING');
-      setSubmitting(false);
+      setStatus('PENDING');
 
-      toast({ title: 'Translation queued', description: 'Submitting to GenLayer blockchain...' });
+      // Step 2: Poll backend for txHash and final result
+      const finalResult = await pollBackend(translationId, (s, hash) => {
+        setStatus(s as Status);
+        if (hash) setTxHash(hash);
+      });
 
-      // Step 2: Poll backend until we get a txHash (backend submits async)
-      const hash = await waitForTxHash(translationId);
-
-      if (hash) {
-        setTxHash(hash);
-        toast({ title: 'On-chain', description: `Tx: ${hash.slice(0, 18)}...` });
-
-        // Step 3: Frontend polls GenLayer directly for live consensus stages
-        const consensus = await pollGenLayerTx(hash, setChainStatus);
-
-        const finalTranslation = consensus.finalTranslation || await pollBackendForTranslation(translationId);
-
-        setResult({
-          translationId,
-          finalTranslation,
-          confidenceScore: consensus.confidenceScore,
-          semanticScore: consensus.semanticScore,
-          toneScore: consensus.toneScore,
-          txHash: hash,
-          agents: consensus.agents,
-        });
+      if (finalResult) {
+        setResult(finalResult);
+        setStatus('COMPLETED');
+        toast({ title: 'Translation verified on-chain', description: 'Consensus reached successfully' });
       } else {
-        // GenLayer had no txHash — fall back to backend-only polling
-        const finalTranslation = await pollBackendForTranslation(translationId);
-        const backendData = await translationApi.get(translationId);
-        const t = backendData.data.data;
-        setResult({
-          translationId,
-          finalTranslation,
-          confidenceScore: t.confidenceScore || 80,
-          semanticScore: t.confidenceScore * 0.96 || 76,
-          toneScore: t.confidenceScore * 0.91 || 72,
-          txHash: t.contractTxHash || '',
-          agents: t.results || [],
-        });
-        if (t.contractTxHash) setTxHash(t.contractTxHash);
+        setStatus('FAILED');
+        toast({ variant: 'destructive', title: 'Translation failed', description: 'Could not complete in time' });
       }
-
-      setChainStatus('FINALIZED');
-      toast({ title: 'Translation verified on-chain', description: 'Consensus reached successfully' });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Translation failed';
       toast({ variant: 'destructive', title: 'Translation failed', description: msg });
-      setChainStatus(null);
-    } finally {
-      setSubmitting(false);
+      setStatus('FAILED');
     }
   };
 
@@ -287,14 +151,13 @@ export default function TranslatePage() {
           </SelectContent>
         </Select>
 
-        {/* Live chain status badge */}
-        {chainStatus && (
+        {status && (
           <Badge
-            variant={chainStatus === 'FINALIZED' ? 'success' : chainStatus === 'UNDETERMINED' ? 'destructive' : 'info'}
+            variant={status === 'COMPLETED' ? 'success' : status === 'FAILED' ? 'destructive' : 'info'}
             className="gap-1.5 text-xs"
           >
             {isProcessing && <Loader2 className="h-3 w-3 animate-spin" />}
-            {STATUS_LABELS[chainStatus] || chainStatus}
+            {STATUS_LABELS[status] || status}
           </Badge>
         )}
       </div>
@@ -339,12 +202,8 @@ export default function TranslatePage() {
             {isProcessing ? (
               <div className="h-56 flex flex-col items-center justify-center gap-3 text-muted-foreground">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                <p className="text-sm font-medium">
-                  {chainStatus ? STATUS_LABELS[chainStatus] : 'Connecting to GenLayer...'}
-                </p>
-                <p className="text-xs opacity-60">
-                  AI validators are reaching on-chain consensus
-                </p>
+                <p className="text-sm font-medium">{STATUS_LABELS[status!]}</p>
+                <p className="text-xs opacity-60">AI validators are reaching on-chain consensus</p>
               </div>
             ) : result ? (
               <div className="h-56 overflow-auto text-sm leading-relaxed">
@@ -375,13 +234,13 @@ export default function TranslatePage() {
 
         {txHash && (
           <a
-            href={`https://studio.genlayer.com/tx/${txHash}`}
+            href={`https://genlayer-explorer.vercel.app/transactions/${txHash}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors font-mono"
           >
             <ExternalLink className="h-3.5 w-3.5" />
-            {txHash.slice(0, 10)}...{txHash.slice(-8)} ↗
+            {txHash.slice(0, 10)}...{txHash.slice(-8)}
           </a>
         )}
       </div>
@@ -425,12 +284,12 @@ export default function TranslatePage() {
                     <span className="font-medium">Validator {agent.agentId}</span>
                     <div className="flex items-center gap-2">
                       {agent.isConsensus && <Badge variant="success" className="text-xs">Agreed</Badge>}
-                      <span className={cn('font-semibold', getConfidenceColor(agent.confidence))}>
-                        {agent.confidence?.toFixed(1)}%
+                      <span className={cn('font-semibold', getConfidenceColor(agent.confidenceScore))}>
+                        {agent.confidenceScore?.toFixed(1)}%
                       </span>
                     </div>
                   </div>
-                  <p className="text-muted-foreground text-xs line-clamp-2">{agent.translation}</p>
+                  <p className="text-muted-foreground text-xs line-clamp-2">{agent.translatedText}</p>
                 </div>
               ))}
             </div>
@@ -441,28 +300,39 @@ export default function TranslatePage() {
   );
 }
 
-async function waitForTxHash(translationId: string): Promise<string | null> {
-  for (let i = 0; i < 20; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    try {
-      const { data } = await translationApi.get(translationId);
-      const t = data.data;
-      if (t.contractTxHash) return t.contractTxHash;
-      if (t.status === 'FAILED') return null;
-    } catch { /* ignore */ }
-  }
-  return null;
-}
+async function pollBackend(
+  translationId: string,
+  onUpdate: (status: string, txHash: string | null) => void
+): Promise<TranslationResult | null> {
+  const maxAttempts = 90;
 
-async function pollBackendForTranslation(translationId: string): Promise<string> {
-  for (let i = 0; i < 20; i++) {
-    await new Promise(r => setTimeout(r, 3000));
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 4000));
+
     try {
       const { data } = await translationApi.get(translationId);
       const t = data.data;
-      if (t.status === 'COMPLETED' && t.finalTranslation) return t.finalTranslation;
-      if (t.status === 'FAILED') return '';
-    } catch { /* ignore */ }
+
+      onUpdate(t.status, t.contractTxHash || null);
+
+      if (t.status === 'COMPLETED' && t.finalTranslation) {
+        const consensus = t.results?.find((r: any) => r.isConsensus);
+        return {
+          translationId,
+          finalTranslation: t.finalTranslation,
+          confidenceScore: t.confidenceScore || consensus?.confidenceScore || 80,
+          semanticScore: consensus?.semanticScore || (t.confidenceScore || 80) * 0.96,
+          toneScore: consensus?.toneScore || (t.confidenceScore || 80) * 0.91,
+          txHash: t.contractTxHash || '',
+          agents: t.results || [],
+        };
+      }
+
+      if (t.status === 'FAILED') return null;
+    } catch {
+      // Network error, keep polling
+    }
   }
-  return '';
+
+  return null;
 }
