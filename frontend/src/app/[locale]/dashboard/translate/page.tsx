@@ -99,8 +99,9 @@ export default function TranslatePage() {
             setSourceText(data.data?.text || '');
             setMode('text');
             toast({ title: 'File extracted', description: `${file.name} ready for translation` });
-          } catch {
-            toast({ variant: 'destructive', title: 'Extraction failed', description: 'Could not extract text from file.' });
+          } catch (err: any) {
+            const msg = err?.response?.data?.message || 'Could not extract text from file.';
+            toast({ variant: 'destructive', title: 'Extraction failed', description: msg });
           }
         };
         reader.readAsDataURL(file);

@@ -252,11 +252,21 @@ export async function extractFile(req: AuthRequest, res: Response) {
 
     if (mimeType === 'text/plain' || filename.endsWith('.txt')) {
       const text = buffer.toString('utf-8');
-      return sendSuccess(res, { text, filename }, 'File extracted');
+      return sendSuccess(res, { text, filename });
     }
 
-    return sendError(res, 'PDF and DOCX extraction is not yet supported. Please copy and paste the text directly.', 422);
-  } catch {
-    return sendError(res, 'File extraction failed', 500);
+    if (mimeType === 'application/pdf' || filename.endsWith('.pdf')) {
+      const { PDFParse } = await import('pdf-parse');
+      const parser = new PDFParse({ data: buffer } as any);
+      const text = await (parser as any).getText();
+      const extracted = (typeof text === 'string' ? text : '').trim();
+      if (!extracted) return sendError(res, 'No text found in PDF. The file may be scanned or image-based.', 422);
+      return sendSuccess(res, { text: extracted, filename });
+    }
+
+    return sendError(res, 'DOCX extraction is not yet supported. Please copy and paste the text directly.', 422);
+  } catch (err: any) {
+    logger.error('File extraction failed', { filename, error: err?.message });
+    return sendError(res, 'File extraction failed. The file may be corrupted or password-protected.', 500);
   }
 }
