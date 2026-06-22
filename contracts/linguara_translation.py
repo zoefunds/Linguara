@@ -345,10 +345,7 @@ class LinguaraTranslation(gl.Contract):
             f"Text to translate:\n{source_text}"
         )
 
-        translation_result = gl.get_webpage(
-            "https://api.openai.com",
-            translation_prompt,
-        )
+        translation_result = gl.exec_prompt(translation_prompt)
 
         final_translation = translation_result.strip()
         if not final_translation:
@@ -423,7 +420,7 @@ class LinguaraTranslation(gl.Contract):
             "Nothing else.\n\nText:\n" + safe_sample
         )
 
-        detected = gl.get_webpage("https://api.openai.com", detect_prompt).strip().lower()
+        detected = gl.exec_prompt(detect_prompt).strip().lower()
 
         result = {
             "detected_language": detected,
