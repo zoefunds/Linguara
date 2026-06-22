@@ -86,7 +86,7 @@ async function submitToGenLayer(
       data: { status: 'PROCESSING' },
     });
 
-    const txHash = await sendTranslationTx(
+    const txHashOrMeta = await sendTranslationTx(
       userPrivateKey,
       translationId,
       params.sourceText,
@@ -96,12 +96,19 @@ async function submitToGenLayer(
       senderAddress
     );
 
-    logger.info('GenLayer tx submitted', { txHash, translationId });
+    // For multi-chunk, store the first hash so the explorer link works
+    const displayHash = txHashOrMeta.startsWith('{')
+      ? JSON.parse(txHashOrMeta).hashes[0]
+      : txHashOrMeta;
+
+    logger.info('GenLayer tx submitted', { txHash: displayHash, translationId });
 
     await prisma.translation.update({
       where: { id: translationId },
-      data: { contractTxHash: txHash, status: 'PROCESSING' },
+      data: { contractTxHash: displayHash, status: 'PROCESSING' },
     });
+
+    const txHash = txHashOrMeta;
 
     await prisma.auditLog.create({
       data: {
@@ -109,12 +116,12 @@ async function submitToGenLayer(
         userId,
         eventType: 'TRANSLATION_SUBMITTED_ONCHAIN',
         actor: userId,
-        payload: { txHash, senderAddress, ...params },
-        onChainRef: txHash,
+        payload: { txHash: displayHash, senderAddress, ...params },
+        onChainRef: displayHash,
       },
     });
 
-    await pollAndSaveResult(translationId, userId, txHash);
+    await pollAndSaveResult(translationId, userId, txHash, displayHash);
   } catch (err) {
     logger.error('submitToGenLayer failed', { err, translationId });
     await prisma.translation.update({
@@ -133,7 +140,7 @@ async function submitToGenLayer(
   }
 }
 
-async function pollAndSaveResult(translationId: string, userId: string, txHash: string) {
+async function pollAndSaveResult(translationId: string, userId: string, txHash: string, displayHash: string) {
   const result = await pollUntilFinalized(txHash);
 
   for (const agent of result.agents) {

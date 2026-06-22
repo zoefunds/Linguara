@@ -47,8 +47,52 @@ async function getReadOnlyClient() {
 
 const CONTRACT = config.genLayer.contractAddress as `0x${string}`;
 
+const CHUNK_SIZE = 2500;   // chars per chunk sent to the contract
+const MAX_CHUNK_CHARS = 14000; // hard contract limit is 15k, stay under it
+
+/**
+ * Split text into chunks at paragraph boundaries, each ≤ CHUNK_SIZE chars.
+ * Returns [text] unchanged when text fits in one chunk.
+ */
+function splitIntoChunks(text: string): string[] {
+  if (text.length <= CHUNK_SIZE) return [text];
+
+  const paragraphs = text.split(/\n\n+/);
+  const chunks: string[] = [];
+  let current = '';
+
+  for (const para of paragraphs) {
+    const candidate = current ? `${current}\n\n${para}` : para;
+    if (candidate.length > CHUNK_SIZE && current) {
+      chunks.push(current.trim());
+      current = para;
+    } else if (para.length > MAX_CHUNK_CHARS) {
+      // Paragraph itself is too long — split by sentence
+      if (current) { chunks.push(current.trim()); current = ''; }
+      const sentences = para.split(/(?<=[.!?])\s+/);
+      let buf = '';
+      for (const s of sentences) {
+        const c = buf ? `${buf} ${s}` : s;
+        if (c.length > CHUNK_SIZE && buf) {
+          chunks.push(buf.trim());
+          buf = s;
+        } else {
+          buf = c;
+        }
+      }
+      if (buf) current = buf;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) chunks.push(current.trim());
+  return chunks.filter(c => c.length > 0);
+}
+
 /**
  * Submit a translation write transaction using the user's wallet private key.
+ * For texts > CHUNK_SIZE chars, sends multiple parallel transactions and returns
+ * a synthetic "multi-chunk" pseudo-hash that the caller reassembles.
  */
 export async function sendTranslationTx(
   userPrivateKey: string,
@@ -61,18 +105,45 @@ export async function sendTranslationTx(
 ): Promise<string> {
   if (!CONTRACT) throw new Error('GENLAYER_CONTRACT_ADDRESS not configured');
 
-  const client = await getGLClient(userPrivateKey);
+  const chunks = splitIntoChunks(sourceText);
 
-  // Contract signature: translate_text(translation_id, source_text, source_language, target_language, domain, requestor_address)
-  const txHash = await client.writeContract({
-    address: CONTRACT,
-    functionName: 'translate_text',
-    args: [translationId, sourceText, sourceLanguage || 'auto', targetLanguage, domain || 'general', senderAddress],
-    value: 0n,
+  if (chunks.length === 1) {
+    // Fast path: single transaction (unchanged behaviour for short texts)
+    const client = await getGLClient(userPrivateKey);
+    const txHash = await client.writeContract({
+      address: CONTRACT,
+      functionName: 'translate_text',
+      args: [translationId, sourceText, sourceLanguage || 'auto', targetLanguage, domain || 'general', senderAddress],
+      value: 0n,
+    });
+    logger.info('GenLayer tx submitted (single chunk)', { txHash, translationId });
+    return txHash;
+  }
+
+  // Multi-chunk path: submit each chunk as a separate tx, return JSON metadata
+  logger.info('Long text detected, splitting into chunks', {
+    translationId,
+    totalChars: sourceText.length,
+    chunkCount: chunks.length,
   });
 
-  logger.info('GenLayer writeContract submitted', { txHash });
-  return txHash;
+  const client = await getGLClient(userPrivateKey);
+  const chunkHashes = await Promise.all(
+    chunks.map(async (chunk, i) => {
+      const chunkId = `${translationId}__chunk_${i}`;
+      const txHash = await client.writeContract({
+        address: CONTRACT,
+        functionName: 'translate_text',
+        args: [chunkId, chunk, sourceLanguage || 'auto', targetLanguage, domain || 'general', senderAddress],
+        value: 0n,
+      });
+      logger.info('GenLayer chunk submitted', { txHash, chunkId, index: i });
+      return txHash;
+    })
+  );
+
+  // Return a JSON sentinel so pollUntilFinalized knows to handle multiple hashes
+  return JSON.stringify({ multi: true, hashes: chunkHashes, count: chunks.length });
 }
 
 /**
@@ -103,24 +174,70 @@ export async function getTransactionStatus(txHash: string) {
 }
 
 /**
- * Wait until the transaction reaches ACCEPTED state using genlayer-js built-in polling.
+ * Wait until the transaction(s) reach ACCEPTED state.
+ * Handles both single-tx and multi-chunk (JSON sentinel from sendTranslationTx).
  */
-export async function pollUntilFinalized(txHash: string): Promise<TranslationConsensusResult> {
-  const client = await getReadOnlyClient();
+export async function pollUntilFinalized(txHashOrMeta: string): Promise<TranslationConsensusResult> {
+  // Multi-chunk path
+  if (txHashOrMeta.startsWith('{')) {
+    let meta: { multi: boolean; hashes: string[]; count: number };
+    try {
+      meta = JSON.parse(txHashOrMeta);
+    } catch {
+      throw new Error('Invalid multi-chunk metadata');
+    }
 
+    if (meta.multi && Array.isArray(meta.hashes)) {
+      logger.info('Polling multi-chunk translations', { count: meta.hashes.length });
+
+      const client = await getReadOnlyClient();
+      const receipts = await Promise.all(
+        meta.hashes.map(hash =>
+          client.waitForTransactionReceipt({
+            hash: hash as `0x${string}`,
+            status: 'ACCEPTED',
+            interval: 4000,
+            retries: 90,
+          })
+        )
+      );
+
+      // Extract translation from each chunk receipt and concatenate in order
+      const chunkTranslations = receipts.map((r, i) => {
+        const parsed = parseResult(meta.hashes[i], r);
+        return parsed.finalTranslation;
+      });
+
+      const finalTranslation = chunkTranslations.join('\n\n');
+      const firstResult = parseResult(meta.hashes[0], receipts[0]);
+
+      logger.info('Multi-chunk translations assembled', {
+        chunks: chunkTranslations.length,
+        totalChars: finalTranslation.length,
+      });
+
+      return {
+        ...firstResult,
+        finalTranslation,
+        txHash: meta.hashes[0], // use first hash as canonical reference
+      };
+    }
+  }
+
+  // Single-tx path (unchanged)
+  const client = await getReadOnlyClient();
   try {
     const receipt = await client.waitForTransactionReceipt({
-      hash: txHash as `0x${string}`,
+      hash: txHashOrMeta as `0x${string}`,
       status: 'ACCEPTED',
       interval: 4000,
       retries: 90,
     });
-
-    logger.info('GenLayer tx accepted', { txHash, receipt: JSON.stringify(receipt).slice(0, 200) });
-    return parseResult(txHash, receipt);
+    logger.info('GenLayer tx accepted', { txHash: txHashOrMeta, receipt: JSON.stringify(receipt).slice(0, 200) });
+    return parseResult(txHashOrMeta, receipt);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    logger.error('GenLayer waitForTransactionReceipt failed', { txHash, err: msg });
+    logger.error('GenLayer waitForTransactionReceipt failed', { txHash: txHashOrMeta, err: msg });
     throw e;
   }
 }
