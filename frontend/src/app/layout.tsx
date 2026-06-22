@@ -18,6 +18,12 @@ export const metadata: Metadata = {
   },
   twitter: { card: 'summary_large_image', title: 'Linguara', description: 'AI-powered translation verified on-chain.' },
   metadataBase: new URL('https://linguara-sigma.vercel.app'),
+  icons: {
+    icon: [
+      { url: '/favicon.png', type: 'image/png' },
+    ],
+    apple: '/logo.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

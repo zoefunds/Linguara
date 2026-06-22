@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { Globe, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const links = [
@@ -30,7 +30,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2">
-            <Globe className="h-5 w-5 text-primary" />
+            <img src="/logo.png" alt="Linguara" className="h-8 w-8 rounded-xl" />
             <span className="font-bold text-lg tracking-tight">Linguara</span>
           </Link>
 

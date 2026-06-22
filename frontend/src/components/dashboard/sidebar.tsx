@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Globe, Languages, Clock, FileText, Shield, Wallet, Settings, BarChart3, LogOut } from 'lucide-react';
+import { Languages, Clock, FileText, Shield, Wallet, Settings, BarChart3, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -29,7 +29,7 @@ export function DashboardSidebar() {
     <aside className="hidden md:flex w-60 border-r border-[#d4cfc0] bg-[#e8e4d8]/70 flex-col">
       <div className="p-5 border-b border-[#d4cfc0]">
         <Link href="/" className="flex items-center gap-2 font-bold text-lg text-foreground">
-          <Globe className="h-5 w-5 text-primary" />
+          <img src="/logo.png" alt="Linguara" className="h-8 w-8 rounded-xl" />
           <span>Linguara</span>
         </Link>
       </div>

@@ -1,6 +1,6 @@
 'use client';
 import { usePathname } from 'next/navigation';
-import { Bell, Globe } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/store/auth.store';
@@ -24,7 +24,7 @@ export function DashboardHeader() {
     <header className="h-16 border-b border-[#d4cfc0] bg-[#efece4]/95 backdrop-blur flex items-center justify-between px-6 sticky top-0 z-30">
       <div className="flex items-center gap-3">
         <div className="md:hidden">
-          <Globe className="h-5 w-5 text-primary" />
+          <img src="/logo.png" alt="Linguara" className="h-7 w-7 rounded-lg" />
         </div>
         <h1 className="font-semibold text-foreground">{titles[segment] || 'Dashboard'}</h1>
       </div>

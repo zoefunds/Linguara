@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Globe, Loader2, ShieldCheck } from 'lucide-react';
+import { Loader2, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,7 +43,7 @@ export default function LoginPage() {
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-foreground text-[#efece4] flex-col justify-between p-12">
         <Link href="/" className="flex items-center gap-2 font-bold text-xl">
-          <Globe className="h-6 w-6 text-primary" />
+          <img src="/logo.png" alt="Linguara" className="h-9 w-9 rounded-xl" />
           <span>Linguara</span>
         </Link>
         <div className="space-y-6">

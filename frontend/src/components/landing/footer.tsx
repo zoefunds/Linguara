@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { Globe } from 'lucide-react';
 
 const links = {
   Product: [
@@ -27,7 +26,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-2 font-bold text-lg text-foreground">
-              <Globe className="h-5 w-5 text-primary" />
+              <img src="/logo.png" alt="Linguara" className="h-7 w-7 rounded-lg" />
               <span>Linguara</span>
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed">
