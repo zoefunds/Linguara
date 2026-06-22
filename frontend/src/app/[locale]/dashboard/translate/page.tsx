@@ -117,21 +117,29 @@ async function pollGenLayerTx(
 }
 
 function extractResult(consensusData?: Record<string, unknown>) {
-  const final = consensusData?.final as Record<string, unknown> | undefined;
-  const validators = (consensusData?.validators as Array<Record<string, unknown>>) || [];
-
+  // Extract translation from leader_receipt eq_outputs
   let finalTranslation = '';
-  if (typeof final?.result === 'string') finalTranslation = final.result.trim();
+  const leaderReceipts = (consensusData?.leader_receipt as any[]) || [];
+  if (leaderReceipts.length > 0) {
+    const eqOutputs = leaderReceipts[0]?.eq_outputs || {};
+    const firstOutput = eqOutputs['0'] || eqOutputs[0];
+    if (firstOutput?.payload?.readable) {
+      finalTranslation = stripQuotes(firstOutput.payload.readable);
+    }
+  }
 
-  const agreeCount = validators.filter(v => v.vote === 'agree').length;
-  const total = validators.length || 1;
+  // Derive confidence from votes
+  const votes = (consensusData?.votes || {}) as Record<string, string>;
+  const voteValues = Object.values(votes);
+  const agreeCount = voteValues.filter(v => v === 'agree').length;
+  const total = voteValues.length || 1;
   const confidenceScore = Math.min(100, (agreeCount / total) * 100) || 82;
 
-  const agents = validators.map((v, i) => ({
+  const agents = Object.entries(votes).map(([, vote], i) => ({
     agentId: i + 1,
-    translation: typeof v.result === 'string' ? v.result.trim() : finalTranslation,
-    confidence: v.vote === 'agree' ? confidenceScore : confidenceScore * 0.6,
-    isConsensus: v.vote === 'agree',
+    translation: finalTranslation,
+    confidence: vote === 'agree' ? confidenceScore : confidenceScore * 0.6,
+    isConsensus: vote === 'agree',
   }));
 
   return {
@@ -141,6 +149,13 @@ function extractResult(consensusData?: Record<string, unknown>) {
     toneScore: confidenceScore * 0.91,
     agents,
   };
+}
+
+function stripQuotes(s: string): string {
+  const t = s.trim();
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'")))
+    return t.slice(1, -1);
+  return t;
 }
 
 export default function TranslatePage() {

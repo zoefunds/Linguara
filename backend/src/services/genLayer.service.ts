@@ -126,31 +126,52 @@ export async function pollUntilFinalized(txHash: string): Promise<TranslationCon
 }
 
 function parseResult(txHash: string, receipt: any): TranslationConsensusResult {
-  // The receipt from genlayer-js contains the decoded result
-  const finalTranslation = typeof receipt?.result === 'string'
-    ? receipt.result.trim()
-    : '';
+  const consensusData = receipt?.consensus_data || receipt?.consensusData || {};
 
-  const consensusData = receipt?.consensus_data || receipt?.consensusData;
-  const validators = consensusData?.validators || [];
+  // Extract translation from leader_receipt eq_outputs
+  let finalTranslation = '';
+  const leaderReceipts = consensusData.leader_receipt || [];
+  if (leaderReceipts.length > 0) {
+    const eqOutputs = leaderReceipts[0]?.eq_outputs || {};
+    // eq_outputs["0"] is the first translation candidate
+    const firstOutput = eqOutputs['0'] || eqOutputs[0];
+    if (firstOutput?.payload?.readable) {
+      finalTranslation = stripQuotes(firstOutput.payload.readable);
+    }
 
-  const agreeCount = validators.filter((v: any) => v.vote === 'agree').length;
-  const total = validators.length || 1;
+    // Try to extract quality scores from eq_outputs (the scoring step)
+    for (const key of Object.keys(eqOutputs)) {
+      const payload = eqOutputs[key]?.payload?.readable;
+      if (payload && payload.includes('semantic_score')) {
+        try {
+          const scores = JSON.parse(stripQuotes(payload));
+          if (scores.semantic_score) {
+            return buildResult(txHash, finalTranslation, scores, consensusData);
+          }
+        } catch {}
+      }
+    }
+  }
+
+  // Fallback: derive scores from votes
+  const votes = consensusData.votes || {};
+  const voteValues = Object.values(votes) as string[];
+  const agreeCount = voteValues.filter(v => v === 'agree').length;
+  const total = voteValues.length || 1;
   const confidenceScore = Math.min(100, (agreeCount / total) * 100) || 80;
 
-  const agents = validators.map((v: any, i: number) => {
-    const translation = typeof v.result === 'string' ? v.result.trim() : finalTranslation;
-    const confidence = v.vote === 'agree' ? confidenceScore : confidenceScore * 0.6;
-    return {
+  const validators = consensusData.validators || [];
+  const agents = validators
+    .filter((v: any) => v.vote === 'agree')
+    .map((v: any, i: number) => ({
       agentId: i + 1,
-      translation,
-      confidence,
-      semantic: confidence * 0.96,
-      tone: confidence * 0.91,
-      cultural: confidence * 0.88,
-      isConsensus: v.vote === 'agree',
-    };
-  });
+      translation: finalTranslation,
+      confidence: confidenceScore,
+      semantic: confidenceScore * 0.96,
+      tone: confidenceScore * 0.91,
+      cultural: confidenceScore * 0.88,
+      isConsensus: true,
+    }));
 
   return {
     finalTranslation,
@@ -169,4 +190,52 @@ function parseResult(txHash: string, receipt: any): TranslationConsensusResult {
       isConsensus: true,
     }],
   };
+}
+
+function buildResult(
+  txHash: string,
+  finalTranslation: string,
+  scores: any,
+  consensusData: any
+): TranslationConsensusResult {
+  const semantic = clamp(scores.semantic_score || 0);
+  const tone = clamp(scores.tone_score || 0);
+  const cultural = clamp(scores.cultural_score || 0);
+  const fluency = clamp(scores.fluency_score || 0);
+  const domain = clamp(scores.domain_accuracy || 0);
+  const confidenceScore = (semantic + tone + cultural + fluency + domain) / 5;
+
+  const votes = consensusData.votes || {};
+  const validators = Object.entries(votes).map(([addr, vote], i) => ({
+    agentId: i + 1,
+    translation: finalTranslation,
+    confidence: vote === 'agree' ? confidenceScore : confidenceScore * 0.6,
+    semantic,
+    tone,
+    cultural,
+    isConsensus: vote === 'agree',
+  }));
+
+  return {
+    finalTranslation,
+    confidenceScore,
+    semanticScore: semantic,
+    toneScore: tone,
+    culturalScore: cultural,
+    txHash,
+    agents: validators,
+  };
+}
+
+function stripQuotes(s: string): string {
+  const trimmed = s.trim();
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function clamp(v: number, lo = 0, hi = 100): number {
+  return Math.max(lo, Math.min(hi, Number(v) || 0));
 }
