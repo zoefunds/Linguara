@@ -11,7 +11,14 @@ import { toast } from '@/hooks/use-toast';
 import { cn, getConfidenceColor, getConfidenceBg } from '@/lib/utils';
 
 const GENLAYER_RPC = 'https://studio.genlayer.com/api';
-const CONTRACT = process.env.NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS!;
+
+// GenLayer returns numeric status codes
+const STATUS_NUMBER_TO_NAME: Record<string, string> = {
+  '0': 'UNINITIALIZED', '1': 'PENDING', '2': 'PROPOSING', '3': 'COMMITTING',
+  '4': 'REVEALING', '5': 'ACCEPTED', '6': 'UNDETERMINED', '7': 'FINALIZED',
+  '8': 'CANCELED', '9': 'APPEAL_REVEALING', '10': 'APPEAL_COMMITTING',
+  '11': 'READY_TO_FINALIZE', '12': 'VALIDATORS_TIMEOUT', '13': 'LEADER_TIMEOUT',
+};
 
 const TERMINAL_STATUSES = ['FINALIZED', 'ACCEPTED', 'UNDETERMINED', 'CANCELED'];
 
@@ -24,6 +31,9 @@ const STATUS_LABELS: Record<string, string> = {
   FINALIZED: 'On-chain — verified!',
   UNDETERMINED: 'Consensus undetermined',
   CANCELED: 'Transaction canceled',
+  READY_TO_FINALIZE: 'Ready to finalize...',
+  VALIDATORS_TIMEOUT: 'Validators timed out',
+  LEADER_TIMEOUT: 'Leader timed out',
 };
 
 const LANGUAGES = [
@@ -87,7 +97,8 @@ async function pollGenLayerTx(
       const raw = await genLayerRpc('gen_getTransactionByHash', [txHash]) as Record<string, unknown> | null;
       if (!raw) continue;
 
-      const status = raw.status as ChainStatus;
+      const rawStatus = String(raw.status);
+      const status = (STATUS_NUMBER_TO_NAME[rawStatus] || rawStatus) as ChainStatus;
       onStatus(status);
 
       if (status === 'UNDETERMINED') throw new Error('Consensus could not be reached — please retry');

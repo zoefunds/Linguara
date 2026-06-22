@@ -103,39 +103,26 @@ export async function getTransactionStatus(txHash: string) {
 }
 
 /**
- * Poll until the transaction reaches a terminal state.
+ * Wait until the transaction reaches ACCEPTED state using genlayer-js built-in polling.
  */
 export async function pollUntilFinalized(txHash: string): Promise<TranslationConsensusResult> {
   const client = await getReadOnlyClient();
-  const maxAttempts = 60;
 
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(r => setTimeout(r, 4000));
+  try {
+    const receipt = await client.waitForTransactionReceipt({
+      hash: txHash as `0x${string}`,
+      status: 'ACCEPTED',
+      interval: 4000,
+      retries: 90,
+    });
 
-    try {
-      const receipt = await client.getTransaction({ hash: txHash as `0x${string}` });
-      const status = receipt?.status;
-
-      logger.info('GenLayer poll', { txHash, status, attempt: i + 1 });
-
-      if (status === 'UNDETERMINED') {
-        throw new Error('GenLayer consensus undetermined');
-      }
-      if (status === 'CANCELED') {
-        throw new Error('GenLayer transaction canceled');
-      }
-
-      if (status === 'FINALIZED' || status === 'ACCEPTED') {
-        return parseResult(txHash, receipt);
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes('undetermined') || msg.includes('canceled')) throw e;
-      logger.warn('GenLayer poll error (retrying)', { txHash, attempt: i + 1, err: msg });
-    }
+    logger.info('GenLayer tx accepted', { txHash, receipt: JSON.stringify(receipt).slice(0, 200) });
+    return parseResult(txHash, receipt);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logger.error('GenLayer waitForTransactionReceipt failed', { txHash, err: msg });
+    throw e;
   }
-
-  throw new Error('GenLayer transaction timed out after 4 minutes');
 }
 
 function parseResult(txHash: string, receipt: any): TranslationConsensusResult {
