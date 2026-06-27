@@ -308,6 +308,7 @@ export default function TranslatePage() {
         <ChainStatusTracker
           translationId={translationId}
           txHash={txHash}
+          dbStatus={status}
           active={isProcessing}
         />
       )}

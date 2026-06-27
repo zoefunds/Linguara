@@ -13,17 +13,36 @@ const STAGES = [
   { key: 'FINALIZED',  label: 'Finalized',  desc: 'Translation verified and finalized' },
 ];
 
-const STAGE_INDEX: Record<string, number> = Object.fromEntries(STAGES.map((s, i) => [s.key, i]));
+const CHAIN_STAGE_INDEX: Record<string, number> = {
+  PENDING: 0, PROPOSING: 1, COMMITTING: 2, REVEALING: 3, ACCEPTED: 4, FINALIZED: 5,
+};
+
+// Map DB status → minimum stage index so the tracker always shows progress
+// even when the chain-status call fails or returns null.
+const DB_STATUS_STAGE: Record<string, number> = {
+  PENDING: 0,
+  PROCESSING: 1, // tx submitted, validators working
+  COMPLETED: 5,  // finalized
+  FAILED: -1,
+};
 
 interface Props {
   translationId: string;
   txHash: string | null;
+  dbStatus: string | null;
   active: boolean;
 }
 
-export function ChainStatusTracker({ translationId, txHash, active }: Props) {
-  const [chainStatus, setChainStatus] = useState<string | null>(null);
-  const [error, setError] = useState(false);
+export function ChainStatusTracker({ translationId, txHash, dbStatus, active }: Props) {
+  const [chainStage, setChainStage] = useState<number | null>(null);
+
+  // Animated stage cycling for PROCESSING — steps through Proposing → Committing → Revealing
+  const [animStage, setAnimStage] = useState(1);
+  useEffect(() => {
+    if (dbStatus !== 'PROCESSING' || chainStage !== null) return;
+    const id = setInterval(() => setAnimStage(s => s >= 3 ? 1 : s + 1), 4000);
+    return () => clearInterval(id);
+  }, [dbStatus, chainStage]);
 
   useEffect(() => {
     if (!active || !translationId) return;
@@ -34,14 +53,12 @@ export function ChainStatusTracker({ translationId, txHash, active }: Props) {
         try {
           const { data } = await translationApi.chainStatus(translationId);
           const cs = (data.data?.chainStatus as string | null)?.toUpperCase() ?? null;
-          if (!cancelled) {
-            setChainStatus(cs);
-            setError(false);
-            // Stop polling once finalized or accepted
+          if (!cancelled && cs && cs in CHAIN_STAGE_INDEX) {
+            setChainStage(CHAIN_STAGE_INDEX[cs]);
             if (cs === 'FINALIZED' || cs === 'ACCEPTED') break;
           }
         } catch {
-          if (!cancelled) setError(true);
+          // silently retry — DB-based fallback keeps tracker useful
         }
         await new Promise(r => setTimeout(r, 5000));
       }
@@ -51,12 +68,24 @@ export function ChainStatusTracker({ translationId, txHash, active }: Props) {
     return () => { cancelled = true; };
   }, [translationId, active]);
 
-  const currentIndex = chainStatus ? (STAGE_INDEX[chainStatus] ?? -1) : -1;
+  // Resolve current stage index: prefer live chain data, fall back to DB status
+  let currentIndex: number;
+  if (chainStage !== null) {
+    currentIndex = chainStage;
+  } else if (dbStatus === 'PROCESSING') {
+    currentIndex = animStage; // animated 1→2→3
+  } else {
+    currentIndex = DB_STATUS_STAGE[dbStatus ?? ''] ?? 0;
+  }
+
+  if (currentIndex < 0) return null; // FAILED — don't show tracker
 
   return (
     <div className="rounded-2xl border border-[#d4cfc0] bg-white/60 p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">GenLayer consensus</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          GenLayer consensus
+        </p>
         {txHash && (
           <a
             href={`https://studio.genlayer.com/tx/${txHash}`}
@@ -72,23 +101,21 @@ export function ChainStatusTracker({ translationId, txHash, active }: Props) {
 
       <div className="space-y-2">
         {STAGES.map((stage, i) => {
-          const done = i < currentIndex;
-          const active = i === currentIndex;
-          const pending = i > currentIndex;
+          const done   = i < currentIndex;
+          const isActive = i === currentIndex;
 
           return (
             <div key={stage.key} className="flex items-start gap-3">
-              {/* Connector line */}
               <div className="flex flex-col items-center">
                 <div className={cn(
-                  'w-5 h-5 rounded-full flex items-center justify-center shrink-0 border-2 transition-all',
-                  done    ? 'border-emerald-500 bg-emerald-500' :
-                  active  ? 'border-primary bg-primary' :
-                            'border-[#d4cfc0] bg-white'
+                  'w-5 h-5 rounded-full flex items-center justify-center shrink-0 border-2 transition-all duration-500',
+                  done      ? 'border-emerald-500 bg-emerald-500' :
+                  isActive  ? 'border-primary bg-primary' :
+                              'border-[#d4cfc0] bg-white'
                 )}>
                   {done ? (
                     <CheckCircle2 className="h-3 w-3 text-white" strokeWidth={3} />
-                  ) : active ? (
+                  ) : isActive ? (
                     <Loader2 className="h-3 w-3 text-white animate-spin" />
                   ) : (
                     <Circle className="h-2 w-2 text-[#d4cfc0]" />
@@ -96,22 +123,22 @@ export function ChainStatusTracker({ translationId, txHash, active }: Props) {
                 </div>
                 {i < STAGES.length - 1 && (
                   <div className={cn(
-                    'w-0.5 h-5 mt-0.5 transition-all',
+                    'w-0.5 h-5 mt-0.5 transition-all duration-500',
                     done ? 'bg-emerald-400' : 'bg-[#e8e4d8]'
                   )} />
                 )}
               </div>
 
-              <div className={cn('pb-1', i < STAGES.length - 1 && 'mb-0')}>
+              <div className="pb-1">
                 <p className={cn(
-                  'text-sm font-medium leading-tight',
-                  done   ? 'text-emerald-600' :
-                  active ? 'text-foreground' :
-                           'text-muted-foreground'
+                  'text-sm font-medium leading-tight transition-colors duration-300',
+                  done      ? 'text-emerald-600' :
+                  isActive  ? 'text-foreground' :
+                              'text-muted-foreground'
                 )}>
                   {stage.label}
                 </p>
-                {(done || active) && (
+                {(done || isActive) && (
                   <p className="text-xs text-muted-foreground mt-0.5">{stage.desc}</p>
                 )}
               </div>
@@ -120,13 +147,11 @@ export function ChainStatusTracker({ translationId, txHash, active }: Props) {
         })}
       </div>
 
-      {error && (
-        <p className="text-xs text-muted-foreground">Could not reach explorer — retrying…</p>
-      )}
-
-      {!chainStatus && !error && (
-        <p className="text-xs text-muted-foreground animate-pulse">Waiting for transaction to appear on-chain…</p>
-      )}
+      <p className="text-xs text-muted-foreground">
+        {currentIndex >= 4
+          ? 'Consensus reached — saving result…'
+          : 'Consensus takes 10–20 min — keep this tab open'}
+      </p>
     </div>
   );
 }
