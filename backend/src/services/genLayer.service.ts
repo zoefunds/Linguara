@@ -246,39 +246,65 @@ export async function pollUntilFinalized(txHashOrMeta: string): Promise<Translat
   }
 }
 
+// Decode literal \uXXXX escape sequences the LLM may output as plain text
+function unescapeUnicode(s: string): string {
+  return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+// Parse the JSON blob returned by do_translate() in v3.4.0.
+// IMPORTANT: never pass this through stripQuotes() first — it unescapes \" inside
+// scores_raw, corrupting the JSON and making JSON.parse throw.
+function extractFromContractJSON(raw: string): { translation: string; scores: any } | null {
+  // Strategy 1: raw is directly a JSON string starting with {
+  // e.g. `{"translation": "«...", "scores_raw": "{\"semantic\": ...}"}`
+  const trimmed = raw.trim();
+  const jsonStr = trimmed.startsWith('"') ? (() => { try { return JSON.parse(trimmed); } catch { return null; } })() : trimmed;
+  if (!jsonStr || typeof jsonStr !== 'string') {
+    // Strategy 2: raw IS the object already (genlayer-js auto-parses sometimes)
+    if (typeof raw === 'object' && raw !== null && (raw as any).translation) {
+      const r = raw as any;
+      let scores: any = null;
+      try { scores = JSON.parse(r.scores_raw); } catch {}
+      return { translation: String(r.translation).trim(), scores };
+    }
+    return null;
+  }
+
+  try {
+    const obj = JSON.parse(jsonStr);
+    if (!obj?.translation) return null;
+    let scores: any = null;
+    if (obj.scores_raw) {
+      try { scores = JSON.parse(obj.scores_raw); } catch {
+        const m = String(obj.scores_raw).match(/\{[\s\S]*\}/);
+        if (m) { try { scores = JSON.parse(m[0]); } catch {} }
+      }
+    }
+    return { translation: unescapeUnicode(String(obj.translation).trim()), scores };
+  } catch {
+    return null;
+  }
+}
+
 function parseResult(txHash: string, receipt: any): TranslationConsensusResult {
   const consensusData = receipt?.consensus_data || receipt?.consensusData || {};
 
   let finalTranslation = '';
   let parsedScores: any = null;
 
-  // Leader receipt contains the output of do_translate() for each validator.
-  // v3.4.0: each output is JSON {"translation": "...", "scores_raw": "{...}"}
   const leaderReceipts = consensusData.leader_receipt || [];
   if (leaderReceipts.length > 0) {
     const eqOutputs = leaderReceipts[0]?.eq_outputs || {};
     const firstOutput = eqOutputs['0'] || eqOutputs[0];
     const raw = firstOutput?.payload?.readable;
-    if (raw) {
-      try {
-        const parsed = JSON.parse(stripQuotes(raw));
-        if (parsed.translation) {
-          finalTranslation = parsed.translation.trim();
-          // Parse the embedded scores_raw JSON
-          const scoresRaw = parsed.scores_raw;
-          if (scoresRaw) {
-            try {
-              parsedScores = JSON.parse(scoresRaw);
-            } catch {
-              // scores_raw might have extra text — extract JSON block
-              const match = String(scoresRaw).match(/\{[\s\S]*\}/);
-              if (match) parsedScores = JSON.parse(match[0]);
-            }
-          }
-        }
-      } catch {
-        // v3.3.0 or plain string output — treat as raw translation
-        finalTranslation = stripQuotes(raw);
+    if (raw != null) {
+      const extracted = extractFromContractJSON(typeof raw === 'string' ? raw : JSON.stringify(raw));
+      if (extracted) {
+        finalTranslation = extracted.translation;
+        parsedScores = extracted.scores;
+      } else {
+        // v3.3.0 plain string output
+        finalTranslation = stripQuotes(String(raw));
       }
     }
   }
