@@ -9,6 +9,7 @@ import { MobileSidebar } from './mobile-sidebar';
 const titles: Record<string, string> = {
   translate: 'Translation Workspace',
   history: 'Translation History',
+  id: 'Translation Details',
   documents: 'Documents',
   glossary: 'Glossary',
   audit: 'Audit Trail',
