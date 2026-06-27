@@ -1,4 +1,4 @@
-app = 'linguara-api'
+app = 'linguara-backend'
 primary_region = 'lax'
 
 [build]
