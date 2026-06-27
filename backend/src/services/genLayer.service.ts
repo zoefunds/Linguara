@@ -47,7 +47,7 @@ async function getReadOnlyClient() {
 
 const CONTRACT = config.genLayer.contractAddress as `0x${string}`;
 
-const CHUNK_SIZE = 2500;   // chars per chunk sent to the contract
+const CHUNK_SIZE = 10000;  // chars per chunk; split only for very long texts
 const MAX_CHUNK_CHARS = 14000; // hard contract limit is 15k, stay under it
 
 /**
