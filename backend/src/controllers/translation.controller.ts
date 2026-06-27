@@ -264,7 +264,8 @@ export async function extractFile(req: AuthRequest, res: Response) {
     }
 
     if (mimeType === 'application/pdf' || filename.endsWith('.pdf')) {
-      const pdfParse = (await import('pdf-parse')).default;
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
       const result = await pdfParse(buffer);
       const extracted = (result.text || '').trim();
       if (!extracted) return sendError(res, 'No text found in PDF. The file may be scanned or image-based.', 422);
