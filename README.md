@@ -1,27 +1,91 @@
-# Linguara — Trustworthy AI Translation on GenLayer
+# Linguara — Trustworthy AI Translation, Verified On-Chain
 
-A full-stack decentralized AI translation platform. Every translation is verified by 5 independent AI validators running on GenLayer's Intelligent Contract infrastructure, producing a cryptographically-backed confidence score and an immutable on-chain audit trail.
+**Live app:** [linguara-sigma.vercel.app](https://linguara-sigma.vercel.app)  
+**API:** [linguara-backend.fly.dev](https://linguara-backend.fly.dev)  
+**Explorer:** [studio.genlayer.com](https://studio.genlayer.com)
 
-**Live:** [linguara-sigma.vercel.app](https://linguara-sigma.vercel.app)  
-**API:** [linguara-api.fly.dev](https://linguara-api.fly.dev)  
-**Explorer:** [explorer-studio.genlayer.com](https://explorer-studio.genlayer.com)
+---
+
+## Why Linguara?
+
+Every translation tool on the market — Google Translate, DeepL, Microsoft Translator — shares the same fundamental problem: **you have to trust them blindly.**
+
+Ask Google Translate to translate the same legal clause twice and you may get two different results. Ask it again tomorrow and the answer might change again, because the model was updated silently. There is no audit trail, no proof of what was produced, and no way to verify the output is consistent with what someone else received.
+
+This matters enormously in high-stakes contexts:
+
+- A **legal contract** translated differently for two parties creates ambiguity that can invalidate agreements.
+- A **medical instruction** that varies between translations can endanger patients.
+- A **financial disclosure** that changes between renderings creates regulatory exposure.
+- A **government document** that produces inconsistent translations across requests cannot be relied upon for official use.
+
+Linguara solves this with a fundamentally different architecture.
+
+### How Linguara is different
+
+| | Google Translate / DeepL | Linguara |
+|---|---|---|
+| Translation engine | Single model, single output | 5 independent AI validators |
+| Consistency | Output can change between requests | Same input always produces consensus-verified output |
+| Audit trail | None | Immutable on-chain record for every translation |
+| Verification | You trust the company | Anyone can verify the tx hash on the blockchain |
+| Domain expertise | Generic | Domain-specific prompting (legal, medical, financial, etc.) |
+| Terminology control | None | User glossary enforced in every translation |
+| Confidence score | None | Cryptographically-backed consensus score |
+| Result ownership | Stored on their servers | Stored on-chain and in your account |
+
+### The core guarantee
+
+When you translate with Linguara, five AI validators independently translate your text. GenLayer's consensus mechanism then verifies that all five agree on the meaning before the transaction is accepted. The result — along with a confidence score — is written permanently to the blockchain.
+
+This means:
+
+1. **The translation is reproducible.** Anyone with the transaction hash can verify exactly what was produced.
+2. **The translation is tamper-proof.** No one, including Linguara, can alter it after the fact.
+3. **The translation has a confidence score.** You know how certain the consensus was, not just what the output was.
+4. **The translation has provenance.** You know when it was produced, by what contract version, and with what parameters.
+
+For legal, medical, financial, and government use cases, this is the difference between a tool you use and a tool you can rely on in a dispute.
 
 ---
 
 ## Architecture
 
 ```
-User Browser (Next.js 14)
+User Browser (Next.js 14 · Vercel)
        │
        ▼
-Express API (Fly.io · linguara-api)
+Express API (TypeScript · Fly.io)
        │
-       ├── PostgreSQL (Prisma ORM)
-       ├── Redis (rate limiting)
+       ├── PostgreSQL (Prisma ORM) — user data, translation records, glossary
+       ├── Redis — rate limiting
        └── GenLayer StudioNet
               │
-              └── Intelligent Contract (Python)
-                     5 AI validators → consensus
+              └── Intelligent Contract v3.3.0 (Python)
+                     │
+                     ├── Validator 1 → LLM call → translation
+                     ├── Validator 2 → LLM call → translation
+                     ├── Validator 3 → LLM call → translation
+                     ├── Validator 4 → LLM call → translation
+                     └── Validator 5 → LLM call → translation
+                                │
+                                └── eq_principle.prompt_comparative
+                                       → consensus reached
+                                       → result written on-chain
+```
+
+### Translation flow
+
+```
+1.  User submits text + language + domain + optional glossary/context
+2.  Backend decrypts user's wallet private key (AES-256-GCM)
+3.  Backend calls translate_text() on the Intelligent Contract via genlayer-js
+4.  Five GenLayer validators independently run one LLM call each
+5.  Consensus mechanism verifies all five agree on meaning
+6.  Accepted result is written permanently to the blockchain
+7.  Backend polls until receipt status = ACCEPTED (up to 30 minutes)
+8.  Result extracted from leader_receipt → saved to DB → returned to frontend
+9.  Frontend displays translation, confidence score, chain status, explorer link
 ```
 
 ---
@@ -31,165 +95,178 @@ Express API (Fly.io · linguara-api)
 ```
 Linguara/
 ├── contracts/
-│   └── linguara_translation.py      # Intelligent Contract v3.2.0
+│   └── linguara_translation.py        # Intelligent Contract v3.3.0
 ├── backend/
 │   ├── src/
-│   │   ├── controllers/             # HTTP handlers
+│   │   ├── controllers/
+│   │   │   ├── auth.controller.ts     # register, login, logout, verify, reset
+│   │   │   ├── translation.controller.ts  # create, list, get, rate, chain-status
+│   │   │   └── glossary.controller.ts # list, create, delete glossary terms
 │   │   ├── services/
-│   │   │   ├── genLayer.service.ts  # GenLayer SDK, chunking, polling
-│   │   │   └── email.service.ts     # Brevo transactional email
-│   │   ├── routes/
-│   │   ├── middleware/              # auth, rate-limit, validate
-│   │   ├── config/                  # DB, logger, redis
-│   │   └── utils/                   # wallet crypto, response helpers
-│   ├── prisma/schema.prisma
-│   └── fly.toml                     # Fly.io deployment config
+│   │   │   ├── genLayer.service.ts    # GenLayer SDK, chunking, polling, parsing
+│   │   │   └── email.service.ts       # Brevo transactional email
+│   │   ├── routes/                    # auth · translations · glossary
+│   │   ├── middleware/                # auth (JWT) · rate-limit · validate
+│   │   ├── config/                    # database · logger · redis · env
+│   │   └── utils/                     # wallet crypto · response helpers
+│   ├── prisma/schema.prisma           # User · Wallet · Translation · GlossaryTerm · AuditLog
+│   ├── Dockerfile                     # Multi-stage build for Fly.io
+│   ├── entrypoint.sh                  # Runs prisma db push then starts server
+│   └── fly.toml
 └── frontend/
     ├── src/
-    │   ├── app/
-    │   │   ├── layout.tsx           # Root layout, favicon, metadata
-    │   │   ├── globals.css          # CSS variables (#efece4 cream theme)
-    │   │   └── [locale]/
-    │   │       ├── page.tsx         # Landing page
-    │   │       ├── auth/            # login · register
-    │   │       └── dashboard/       # translate · history · documents
-    │   │                              audit · reports · wallet · settings
+    │   ├── app/[locale]/
+    │   │   ├── page.tsx               # Landing page
+    │   │   ├── auth/                  # login · register · forgot-password
+    │   │   │                            reset-password · verify-email
+    │   │   └── dashboard/             # translate · history · history/[id]
+    │   │                                glossary · documents · audit
+    │   │                                reports · wallet · settings
     │   ├── components/
-    │   │   ├── landing/             # navbar · hero · features · how-it-works
-    │   │   │                          pricing · faq · footer
-    │   │   ├── dashboard/           # sidebar · header
-    │   │   └── ui/                  # shadcn/ui components
-    │   ├── lib/api.ts               # Axios client + all API calls
-    │   └── store/auth.store.ts      # Zustand auth state
+    │   │   ├── landing/               # navbar · hero · features · footer
+    │   │   ├── dashboard/             # sidebar · mobile-sidebar · header
+    │   │   │                            chain-status-tracker
+    │   │   └── ui/                    # shadcn/ui component library
+    │   ├── lib/api.ts                 # Axios client + authApi · translationApi · glossaryApi
+    │   └── store/auth.store.ts        # Zustand auth state
     └── public/
-        ├── logo.png                 # App logo (used everywhere)
-        └── favicon.png              # Browser tab icon
+        ├── logo.png
+        └── favicon.png
 ```
 
 ---
 
-## Intelligent Contract (v3.2.0)
+## Intelligent Contract (v3.3.0)
 
 **File:** `contracts/linguara_translation.py`  
-**Deployed on:** GenLayer StudioNet  
-**Contract address:** `0x5F7eF708d365A3245253c0940C909e1FA9bA13b9`  
-**Consensus contract:** `0xb7278A61aa25c888815aFC32Ad3cC52fF24fE575`
+**Network:** GenLayer StudioNet  
+**Contract address:** `0xB4aB5410D024BbDaC3D8Ecc0d00B868750721408`
 
-### How it works
+### Design philosophy
 
-```python
-from genlayer import *   # gl.Contract, gl.nondet, gl.eq_principle
-import json
+Previous versions of the contract ran 6 LLM calls per validator (multi-agent pipeline: translate, review, score, select, detect, format). With 5 validators, that was 30 total LLM calls per translation — causing consistent timeouts on any text over a few sentences.
 
-class LinguaraTranslation(gl.Contract):
-    def translate_text(self, ...):
-        def do_translate():
-            return gl.nondet.exec_prompt(prompt)   # 1 LLM call per validator
+v3 uses 1 LLM call per validator. GenLayer's 5-validator network *is* the multi-expert layer. The consensus mechanism (`gl.eq_principle.prompt_comparative`) verifies the validators agree semantically before the transaction finalizes.
 
-        final_translation = gl.eq_principle.prompt_comparative(
-            do_translate,
-            "The translations convey the same core meaning and information."
-        )
-        self.translations[translation_id] = json.dumps({...})
+| | v2 | v3.3 (current) |
+|---|---|---|
+| LLM calls per validator | 6 | 1 |
+| Total LLM calls | 30 | 5 |
+| Timeout on long texts | Frequent | None |
+| Consensus | Custom scoring | `prompt_comparative` |
+| Glossary support | No | Yes (injected into prompt) |
+
+### Contract methods
+
+**Write (require consensus):**
+- `translate_text(id, text, src_lang, tgt_lang, domain, address, glossary_json)` — core translation
+- `translate_with_context(...)` — translation with tone + background context notes
+- `detect_language(id, text, address)` — standalone language detection
+- `rate_translation(id, rating, feedback, address)` — 1–5 star rating stored on-chain
+- `add_glossary_term(domain, src_term, tgt_lang, tgt_term, address)` — owner glossary entry
+- `set_paused(paused, address)` — emergency circuit breaker
+
+**View (no consensus needed):**
+- `get_translation(id)` — retrieve stored result by ID
+- `get_translation_status(id)` — lightweight status check
+- `get_user_stats(address)` — per-wallet translation count
+- `get_global_stats()` — contract-wide totals
+- `get_supported_languages()` — full language catalogue (70+ languages)
+- `get_supported_domains()` — supported domain list
+- `get_contract_info()` — version, owner, pause state
+- `get_glossary_term(domain, tgt_lang, src_term)` — look up a glossary entry
+- `get_rating(id)` — retrieve a stored rating
+
+### Glossary enforcement
+
+When a user has saved glossary terms for a target language, the backend fetches them before submitting the transaction and passes them as `glossary_json`. The contract injects them directly into the translation prompt:
+
+```
+User-defined glossary (you MUST use these exact translations for the listed terms):
+  - "force majeure" → "force majeure"
+  - "indemnification" → "indemnisation"
 ```
 
-**Key design decisions:**
+Every validator sees this instruction. The consensus mechanism ensures the final result honours those terms.
 
-| | v2 | v3 (current) |
-|---|---|---|
-| LLM calls per validator | 6 (multi-agent) | 1 |
-| Total LLM calls | 30 | 5 |
-| Timeout on long texts | Yes | No |
-| Consensus mechanism | Custom scoring | `gl.eq_principle.prompt_comparative` |
+### Supported languages
 
-**GenLayer API (correct syntax):**
-- LLM call: `gl.nondet.exec_prompt(prompt)` inside a `def run():` function
-- Comparative consensus: `gl.eq_principle.prompt_comparative(run, principle)`
-- Strict consensus: `gl.eq_principle.strict_eq(run)`
-- Class style: `class X(gl.Contract):` — NOT `@gl.contract` (deprecated, causes schema error)
-- Imports: `from genlayer import *` + `import json`
+70+ languages including English, French, Spanish, German, Portuguese, Italian, Dutch, Russian, Chinese (Simplified + Traditional), Japanese, Korean, Arabic, Hindi, Turkish, Polish, Swedish, Yoruba, Igbo, Hausa, Swahili, Amharic, Zulu, and more.
 
-**Contract features:**
-- `translate_text` — main translation (auto language detect, 15k char limit)
-- `translate_with_context` — translation with background context/tone hints
-- `detect_language` — standalone language detection
-- `rate_translation` — post-translation quality rating (1–5 stars)
-- `add_glossary_term` — user-defined glossary for consistent terminology
-- `set_paused` — admin circuit breaker
+### Supported domains
 
-**Supported:** 70+ languages · 10 domains (general, legal, medical, technical, financial, government, academic, literary, news, marketing)
+`general` · `legal` · `medical` · `technical` · `financial` · `government` · `literary` · `scientific` · `news` · `marketing`
+
+Each domain has a dedicated instruction block in the prompt that guides the AI on appropriate terminology, register, and preservation rules.
 
 ---
 
 ## Backend (Express + TypeScript)
 
-**Deployed:** Fly.io · `linguara-api` · region `lax`
-
-### Key services
-
-**`genLayer.service.ts`**
-```
-CHUNK_SIZE = 2500 chars
-MAX_CHUNK_CHARS = 14000 chars
-
-Short text  → 1 GenLayer tx → poll until ACCEPTED → extract result
-Long text   → split at paragraph boundaries → N parallel GenLayer txs
-            → poll all in parallel → concatenate translations in order
-```
-
-- `sendTranslationTx()` — submits to GenLayer, returns single hash or JSON sentinel `{"multi":true,"hashes":[...],"count":N}`
-- `pollUntilFinalized()` — detects multi-chunk sentinel, polls all in parallel, reassembles
-- `parseResult()` — extracts from `consensus_data.leader_receipt[0].eq_outputs["0"].payload.readable`
-- `stripQuotes()` — unescapes `\n`, `\t`, `\\`, `\"` from JSON-encoded payload
-
-**Translation result extraction path:**
-```
-receipt.consensus_data.leader_receipt[0].eq_outputs["0"].payload.readable
-```
-
-**Polling config:** `waitForTransactionReceipt({ status: 'ACCEPTED', interval: 4000, retries: 90 })`
+**Deployed:** Fly.io · `linguara-backend.fly.dev`
 
 ### API endpoints
 
 ```
-POST   /api/auth/register          Create account + generate ETH wallet
-POST   /api/auth/login             JWT login
-POST   /api/auth/logout
-GET    /api/auth/me
+Auth
+  POST   /api/v1/auth/register          Create account + auto-generate ETH wallet
+  POST   /api/v1/auth/login             Returns access + refresh JWT tokens
+  POST   /api/v1/auth/logout
+  GET    /api/v1/auth/me                Current user + wallet address
+  POST   /api/v1/auth/forgot-password   Send reset email via Brevo
+  POST   /api/v1/auth/reset-password    Consume token + set new password
+  GET    /api/v1/auth/verify-email      Consume email verification token
+  POST   /api/v1/auth/export-key        Return decrypted private key (password-gated)
+  POST   /api/v1/auth/refresh           Refresh access token
 
-POST   /api/translations           Submit translation (fires GenLayer tx async)
-GET    /api/translations           List user's translations (paginated)
-GET    /api/translations/:id       Get single translation + status
-GET    /api/translations/audit     Audit log
-POST   /api/translations/extract-file   Extract text from TXT or PDF file
+Translations
+  POST   /api/v1/translations           Submit translation (fires GenLayer tx async, returns immediately)
+  GET    /api/v1/translations           List user's translations (paginated)
+  GET    /api/v1/translations/:id       Get single translation + validator results
+  GET    /api/v1/translations/:id/chain-status   Live GenLayer chain status for tx
+  POST   /api/v1/translations/:id/rate  Submit 1–5 star rating
+  GET    /api/v1/translations/audit     Full audit log with on-chain references
+
+Glossary
+  GET    /api/v1/glossary               List user's glossary terms
+  POST   /api/v1/glossary               Create a glossary term
+  DELETE /api/v1/glossary/:id           Delete a glossary term
 ```
 
-### Environment variables (backend)
+### Wallet system
+
+Every user gets a unique Ethereum wallet generated at registration:
+- Private key encrypted with AES-256-GCM, keyed to `userId`
+- Stored as `(encryptedPrivateKey, iv, authTag)` in the `wallets` table
+- Decrypted in-memory only when submitting a GenLayer transaction
+- Wallet address visible to the user; private key exportable with password confirmation
+
+### Text chunking
+
+Texts longer than 2,500 characters are split at paragraph boundaries before submission. Each chunk is sent as a separate GenLayer transaction (concurrent). Results are polled in parallel and reassembled in order before saving to the database.
+
+```
+Short text  (<2,500 chars)  → 1 tx  → poll → result
+Long text   (>2,500 chars)  → N txs → poll all in parallel → concatenate in order
+```
+
+### Environment variables
 
 ```env
-DATABASE_URL=
-JWT_SECRET=
-ENCRYPTION_KEY=
-GENLAYER_NODE_URL=
-CONTRACT_ADDRESS=0x5F7eF708d365A3245253c0940C909e1FA9bA13b9
-ADMIN_PRIVATE_KEY=
+DATABASE_URL=postgres://...
+JWT_ACCESS_SECRET=
+JWT_REFRESH_SECRET=
+JWT_ACCESS_EXPIRES=15m
+JWT_REFRESH_EXPIRES=7d
+WALLET_MASTER_KEY=
+GENLAYER_CONTRACT_ADDRESS=0xB4aB5410D024BbDaC3D8Ecc0d00B868750721408
+GENLAYER_PRIVATE_KEY=
+GENLAYER_RPC_URL=
 BREVO_API_KEY=
+BREVO_FROM_EMAIL=
+BREVO_FROM_NAME=Linguara
+FRONTEND_URL=https://linguara-sigma.vercel.app
 REDIS_URL=
-```
-
-### Key dependencies
-
-`express` · `prisma` · `genlayer-js` (ESM-only, loaded via dynamic import) · `ethers` · `pdf-parse` · `bcryptjs` · `jsonwebtoken` · `winston` · `redis` · `@getbrevo/brevo`
-
-**ESM import workaround** (genlayer-js is ESM-only in a CJS project):
-```typescript
-const dynamicImport = new Function('specifier', 'return import(specifier)');
-const { createClient } = await dynamicImport('genlayer-js');
-```
-
-**Fly.io trust proxy** (required for rate-limiting behind Fly):
-```typescript
-app.set('trust proxy', 1);
 ```
 
 ---
@@ -198,206 +275,169 @@ app.set('trust proxy', 1);
 
 **Deployed:** Vercel · `linguara-sigma.vercel.app`
 
-### Routing
-
-Uses `next-intl` with `localePrefix: 'as-needed'` (default locale `en` has no prefix):
+### Pages
 
 ```
-/                          → Landing page
-/auth/login
-/auth/register
-/dashboard/translate       → Translation workspace
-/dashboard/history         → Translation history (expandable)
-/dashboard/documents
-/dashboard/audit
-/dashboard/reports
-/dashboard/wallet
-/dashboard/settings
+/                              Landing page
+/auth/login                    Split dark/cream layout
+/auth/register                 Auto-generates wallet on submit
+/auth/forgot-password
+/auth/reset-password?token=
+/auth/verify-email?token=
+
+/dashboard/translate           Translation workspace
+/dashboard/history             Paginated history (10/page)
+/dashboard/history/[id]        Full detail: scores, validators, on-chain proof
+/dashboard/glossary            Manage terminology glossary
+/dashboard/documents           Document upload (coming soon)
+/dashboard/audit               Full audit trail with on-chain references
+/dashboard/reports             Charts: confidence over time, by language, by domain
+/dashboard/wallet              Wallet address + private key export
+/dashboard/settings            Profile, language preference, account details
 ```
 
-Route structure: `src/app/[locale]/auth/` and `src/app/[locale]/dashboard/` (named segments, not route groups)
+### Chain status tracker
+
+While a translation is processing, the frontend polls `/translations/:id/chain-status` every 5 seconds and displays a live stage tracker:
+
+```
+✅ Pending       — transaction submitted to GenLayer
+🔄 Proposing     — leader validator generating translation   ← active stage (spinner)
+⬜ Committing    — validators committing their votes
+⬜ Revealing     — validators revealing results
+⬜ Accepted      — consensus reached on-chain
+⬜ Finalized     — translation verified and finalized
+```
+
+Each stage has a connector line, green checkmarks for completed stages, and a direct link to the GenLayer explorer for the transaction.
 
 ### Design system
 
-- **Primary background:** `#efece4` (warm cream, HSL `43 27% 92%`)
-- **Color palette:** All defined as CSS variables in `globals.css`
-- **Font:** Inter (body) + Playfair Display (serif accents)
-- **Components:** shadcn/ui + Radix UI primitives
+- **Primary background:** `#efece4` (warm cream)
+- **Cards:** `bg-white/60 border-[#d4cfc0] rounded-2xl`
+- **Components:** shadcn/ui + Radix UI
 - **Icons:** Lucide React
+- **Charts:** Recharts (reports page)
+- **State:** Zustand (auth) + TanStack React Query (server data)
+- **Forms:** React Hook Form
+- **i18n:** next-intl (`localePrefix: 'as-needed'`, default `en` has no prefix)
 
-### Key pages
+### Environment variables
 
-**Translate page** (`/dashboard/translate`)
-- Text mode: paste up to 50,000 characters
-- File mode: upload TXT (extracted instantly) or PDF (text extracted via backend)
-- Language dropdown: 16 languages · Domain dropdown: 6 domains
-- Real-time status badge: SUBMITTING → PENDING → PROCESSING → COMPLETED
-- Polls backend every 4s for up to 90 attempts (6 minutes)
-- On completion: shows translation, confidence scores, validator breakdown
-- Explorer link: `https://explorer-studio.genlayer.com/transactions/${txHash}`
-
-**History page** (`/dashboard/history`)
-- Lists all translations (up to 50)
-- Each card: language pair, domain, date, confidence score
-- "Show translation" expands the full translated text inline
-- Tx hash is a clickable link to the GenLayer explorer
-
-**Auth pages**
-- Split layout: dark left panel + cream right form
-- Register: auto-generates an Ethereum wallet on account creation
-
-### State management
-
-- **Auth:** Zustand (`useAuthStore`) — stores user, JWT token, login/logout
-- **Queries:** TanStack React Query — history, audit log, stats
-- **Forms:** React Hook Form + Zod validation
-
----
-
-## Wallet system
-
-Every user gets a unique Ethereum wallet auto-generated at registration:
-- Private key encrypted with AES-256-GCM using `userId` as key material
-- Stored encrypted in database (`encryptedPrivateKey`, `iv`, `authTag`)
-- Used to sign GenLayer transactions on the user's behalf
-- Wallet address displayed to user at registration
-
----
-
-## GenLayer transaction flow
-
-```
-1. User submits text
-2. Backend decrypts user's private key
-3. Backend calls contract.translate_text(...) via genlayer-js SDK
-4. GenLayer fires the tx → 5 validators each run 1 LLM call
-5. Consensus mechanism verifies semantic equivalence
-6. Receipt stored on-chain
-7. Backend polls waitForTransactionReceipt (status: ACCEPTED)
-8. Backend parses result from leader_receipt[0].eq_outputs["0"].payload.readable
-9. Result saved to DB, returned to frontend
-10. Frontend displays translation + confidence score + explorer link
+```env
+NEXT_PUBLIC_API_URL=https://linguara-backend.fly.dev/api/v1
 ```
 
 ---
 
-## Local development
+## Local Development
 
 ### Prerequisites
+
 - Node.js 18+
 - PostgreSQL
 - Redis
-- Python 3.11+ (for contract development)
+- Python 3.11+ (for contract work only)
 
 ### Backend
 
 ```bash
 cd backend
+cp .env.example .env      # fill in values
 npm install
-npx prisma migrate dev
-npm run dev
+npx prisma db push
+npm run dev               # http://localhost:4000
 ```
 
 ### Frontend
 
 ```bash
 cd frontend
+cp .env.example .env.local
 npm install
-npm run dev
+npm run dev               # http://localhost:3000
 ```
 
-### Contract (deploy manually)
+### Contract (deploy or update)
 
 1. Open [GenLayer Studio](https://studio.genlayer.com)
 2. Paste `contracts/linguara_translation.py`
 3. Deploy to StudioNet
-4. Copy contract address → set `CONTRACT_ADDRESS` in backend `.env`
-
----
-
-## What's done ✅
-
-### Smart Contract
-- [x] Intelligent Contract v3.2.0 deployed on GenLayer StudioNet
-- [x] Single LLM call per validator (was 6 → fixed timeout issues)
-- [x] `gl.nondet.exec_prompt` + `gl.eq_principle.prompt_comparative` (correct API)
-- [x] `class LinguaraTranslation(gl.Contract):` style (fixed "could not load schema" error)
-- [x] 70+ languages, 10 domains, glossary, ratings, context-aware translation
-- [x] 15,000 char limit per contract call
-
-### Backend
-- [x] Full REST API (auth, translations, audit)
-- [x] GenLayer transaction submission and polling
-- [x] Backend chunking for texts >2,500 chars (parallel txs, reassembled)
-- [x] PDF text extraction via `pdf-parse`
-- [x] TXT file extraction
-- [x] `\n\n` literal fix — unescapes JSON escape sequences from payload
-- [x] ETH wallet generation and encrypted storage per user
-- [x] JWT authentication
-- [x] Rate limiting + Redis
-- [x] Brevo email service
-- [x] Deployed on Fly.io with `trust proxy` for correct rate limiting
-
-### Frontend
-- [x] Full website redesign with `#efece4` warm cream color scheme
-- [x] Landing page: navbar, hero, features, how-it-works, pricing, FAQ, footer
-- [x] Dashboard: sidebar, header, all page shells
-- [x] Auth pages: login + register with split dark/cream layout
-- [x] Custom logo (`ling.png`) used everywhere as logo + favicon
-- [x] Translate page: text mode + TXT/PDF file upload
-- [x] Translate page: language dropdown z-index fixed (no longer obscured)
-- [x] History page: expandable full translation text per card
-- [x] All tx hashes link to `explorer-studio.genlayer.com`
-- [x] Deployed on Vercel
-
----
-
-## What's remaining 🔲
-
-### High priority
-- [ ] **DOCX file extraction** — `mammoth` or `docx` npm package needed in backend
-- [ ] **Image-based PDF** — OCR support (tesseract.js already installed, needs wiring)
-- [ ] **Mobile sidebar** — hamburger menu not wired; sidebar hidden on mobile (`hidden md:flex`)
-- [ ] **Dashboard pages** — Documents, Reports, Wallet, Settings pages are empty shells
-
-### Medium priority
-- [ ] **Confidence score calculation** — currently estimates from receipt; should come from contract
-- [ ] **Glossary UI** — contract supports `add_glossary_term` but no frontend for it
-- [ ] **Rate translation UI** — contract supports `rate_translation` but no frontend for it
-- [ ] **Context-aware translation** — `translate_with_context` method exists but not exposed in UI
-- [ ] **Dark mode** — CSS variables defined but theme toggle not implemented
-- [ ] **Internationalization** — next-intl wired but translation strings not populated
-
-### Lower priority
-- [ ] **Email verification flow** — registration sends no verification email yet
-- [ ] **Forgot password flow** — route exists but not implemented
-- [ ] **API key management** — for enterprise programmatic access
-- [ ] **Export to PDF/DOCX** — export translated result as a document
-- [ ] **Team/organization accounts** — multi-user workspaces
-- [ ] **Mainnet deployment** — currently StudioNet (testnet) only
-
----
-
-## Known issues
-
-| Issue | Status |
-|---|---|
-| DOCX upload shows unsupported error | Backend returns 422 — needs `mammoth` |
-| Mobile layout missing sidebar nav | Sidebar is `hidden md:flex` — no mobile menu |
-| Dashboard page shells are empty | Documents, Reports, Wallet, Settings not built |
-| GenLayer finalization time | Consensus takes 30–90s depending on text length |
+4. Copy contract address → set `GENLAYER_CONTRACT_ADDRESS` in backend env and Fly secrets
 
 ---
 
 ## Deployment
 
 ### Backend (Fly.io)
+
 ```bash
-fly deploy --config backend/fly.toml
+cd backend
+fly deploy
 ```
 
+Secrets are set via:
+
+```bash
+fly secrets set KEY=value
+```
+
+The `entrypoint.sh` runs `prisma db push` on every deploy before starting the server, so schema changes are applied automatically.
+
 ### Frontend (Vercel)
-Vercel auto-deploys on push to `main`. Set environment variables in Vercel dashboard:
-```
-NEXT_PUBLIC_API_URL=https://linguara-api.fly.dev/api
-```
+
+Auto-deploys on every push to `main`. Set `NEXT_PUBLIC_API_URL` in the Vercel dashboard.
+
+---
+
+## Current Status
+
+**Network:** GenLayer StudioNet (testnet). Mainnet deployment pending GenLayer mainnet launch.  
+**Translation time:** 10–20 minutes (on-chain consensus). The chain status tracker makes this visible to users.  
+**Document upload:** Temporarily disabled pending backend extraction fix. Users paste text directly.
+
+### Feature checklist
+
+**Smart Contract**
+- [x] Intelligent Contract v3.3.0 on GenLayer StudioNet
+- [x] 1 LLM call per validator (down from 6 — eliminates timeouts)
+- [x] `gl.eq_principle.prompt_comparative` consensus
+- [x] 70+ languages, 10 domains with domain-specific prompting
+- [x] Glossary injection into translation prompt
+- [x] Context-aware translation (`translate_with_context`)
+- [x] On-chain ratings, language detection, admin pause
+
+**Backend**
+- [x] Full REST API with JWT auth + refresh tokens
+- [x] GenLayer async transaction submission (responds immediately, polls in background)
+- [x] Text chunking for long documents (parallel txs, reassembled in order)
+- [x] Wallet generation + AES-256-GCM encrypted storage
+- [x] Glossary fetched per user per target language, passed to contract
+- [x] Live chain status endpoint (Pending → Finalized)
+- [x] Brevo transactional email (verification, password reset, translation complete)
+- [x] Rate limiting via Redis
+- [x] Full audit log with on-chain references
+- [x] 30-minute polling window (retries: 300, interval: 6s)
+- [x] Deployed on Fly.io with Postgres + Redis
+
+**Frontend**
+- [x] Full redesign with `#efece4` cream theme
+- [x] Landing page with feature explanation and value proposition
+- [x] Auth pages: login, register, forgot/reset password, email verification
+- [x] Translation workspace with context hints
+- [x] Live chain status tracker (6-stage visual timeline)
+- [x] Export translation as TXT or PDF
+- [x] Star rating UI (calls backend + contract)
+- [x] Translation history: paginated, expandable, full detail page
+- [x] Detail page: quality scores, all validator results, on-chain proof
+- [x] Glossary management UI
+- [x] Reports with charts (confidence over time, by language, by domain, status)
+- [x] Wallet page: address display + password-gated private key export
+- [x] Mobile sidebar drawer
+- [x] Deployed on Vercel
+
+---
+
+## License
+
+MIT
