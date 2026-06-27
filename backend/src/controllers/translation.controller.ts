@@ -8,18 +8,40 @@ import { decryptPrivateKey } from '../utils/wallet';
 import { logger } from '../config/logger';
 
 // If the contract returned raw JSON {"translation":"...","scores_raw":"..."}, extract just the text.
+// Uses regex extraction so malformed scores_raw JSON can't break the parse.
 function cleanTranslation(raw: string | null): string | null {
   if (!raw) return raw;
   const trimmed = raw.trim();
+
   if (trimmed.startsWith('{')) {
+    // First try full JSON.parse (handles properly formed output)
     try {
       const parsed = JSON.parse(trimmed);
       if (parsed.translation && typeof parsed.translation === 'string') {
-        return parsed.translation.trim();
+        return unescapeUnicode(parsed.translation.trim());
       }
     } catch {}
+
+    // Fallback: regex-extract the value of "translation" key from the JSON string.
+    // This handles cases where scores_raw contains malformed nested JSON that breaks full parse.
+    const match = trimmed.match(/"translation"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (match) {
+      // match[1] is the raw JSON string value — JSON.parse a synthetic wrapper to decode escapes
+      try {
+        const decoded = JSON.parse(`"${match[1]}"`);
+        return unescapeUnicode(decoded.trim());
+      } catch {
+        return unescapeUnicode(match[1].trim());
+      }
+    }
   }
-  return raw;
+
+  return unescapeUnicode(raw);
+}
+
+// Decode literal \uXXXX sequences that the LLM may have output as plain text
+function unescapeUnicode(s: string): string {
+  return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
 }
 
 export async function createTranslation(req: AuthRequest, res: Response) {
