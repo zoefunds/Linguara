@@ -1,6 +1,6 @@
 'use client';
-import { useState, useRef } from 'react';
-import { Copy, Check, ExternalLink, Loader2, AlignLeft, Upload, Zap, ArrowLeftRight, X } from 'lucide-react';
+import { useState } from 'react';
+import { Copy, Check, ExternalLink, Loader2, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -56,7 +56,6 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function TranslatePage() {
-  const [mode, setMode] = useState<'text' | 'file'>('text');
   const [sourceText, setSourceText] = useState('');
   const [targetLang, setTargetLang] = useState('fr');
   const [domain, setDomain] = useState('general');
@@ -64,54 +63,8 @@ export default function TranslatePage() {
   const [txHash, setTxHash] = useState<string | null>(null);
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [copied, setCopied] = useState(false);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [fileLoading, setFileLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isProcessing = status === 'SUBMITTING' || status === 'PENDING' || status === 'PROCESSING';
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const allowed = ['text/plain', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowed.includes(file.type) && !file.name.endsWith('.txt') && !file.name.endsWith('.pdf') && !file.name.endsWith('.docx')) {
-      toast({ variant: 'destructive', title: 'Unsupported file type', description: 'Please upload a TXT, PDF, or DOCX file.' });
-      return;
-    }
-
-    setFileLoading(true);
-    setFileName(file.name);
-
-    try {
-      if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
-        const text = await file.text();
-        setSourceText(text);
-        setMode('text');
-        toast({ title: 'File loaded', description: `${file.name} (${text.length.toLocaleString()} chars)` });
-      } else {
-        // For PDF/DOCX, read as base64 and send to backend for extraction
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const base64 = (ev.target?.result as string)?.split(',')[1];
-          try {
-            const { data } = await translationApi.extractFile({ base64, filename: file.name, mimeType: file.type });
-            setSourceText(data.data?.text || '');
-            setMode('text');
-            toast({ title: 'File extracted', description: `${file.name} ready for translation` });
-          } catch (err: any) {
-            const msg = err?.response?.data?.message || 'Could not extract text from file.';
-            toast({ variant: 'destructive', title: 'Extraction failed', description: msg });
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-    } catch {
-      toast({ variant: 'destructive', title: 'File read error', description: 'Could not read the file.' });
-    } finally {
-      setFileLoading(false);
-    }
-  };
 
   const handleTranslate = async () => {
     if (!sourceText.trim()) {
@@ -162,35 +115,6 @@ export default function TranslatePage() {
       {/* Top controls bar */}
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Mode toggle */}
-          <div className="flex rounded-xl border border-[#d4cfc0] bg-white/60 overflow-hidden p-0.5 gap-0.5">
-            <button
-              onClick={() => setMode('text')}
-              className={cn(
-                'px-4 py-1.5 text-sm font-medium flex items-center gap-2 rounded-lg transition-all',
-                mode === 'text' ? 'bg-foreground text-[#efece4] shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <AlignLeft className="h-3.5 w-3.5" /> Text
-            </button>
-            <button
-              onClick={() => { setMode('file'); fileInputRef.current?.click(); }}
-              className={cn(
-                'px-4 py-1.5 text-sm font-medium flex items-center gap-2 rounded-lg transition-all',
-                mode === 'file' ? 'bg-foreground text-[#efece4] shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Upload className="h-3.5 w-3.5" /> File
-            </button>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".txt,.pdf,.docx"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-
           {/* Language selectors */}
           <Select value={targetLang} onValueChange={setTargetLang}>
             <SelectTrigger className="w-44 bg-white/60 border-[#d4cfc0] rounded-xl">
@@ -222,18 +146,6 @@ export default function TranslatePage() {
           </Badge>
         )}
       </div>
-
-      {/* File indicator */}
-      {fileName && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-white/60 border border-[#d4cfc0] rounded-xl px-4 py-2">
-          <Upload className="h-4 w-4 text-primary" />
-          <span className="font-medium text-foreground">{fileName}</span>
-          {fileLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          <button onClick={() => { setFileName(null); setSourceText(''); }} className="ml-auto text-muted-foreground hover:text-foreground">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
       {/* Translation panes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
