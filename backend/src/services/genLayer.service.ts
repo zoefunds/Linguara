@@ -249,50 +249,88 @@ export async function pollUntilFinalized(txHashOrMeta: string): Promise<Translat
 function parseResult(txHash: string, receipt: any): TranslationConsensusResult {
   const consensusData = receipt?.consensus_data || receipt?.consensusData || {};
 
-  // Extract translation from leader_receipt eq_outputs
   let finalTranslation = '';
+  let parsedScores: any = null;
+
+  // Leader receipt contains the output of do_translate() for each validator.
+  // v3.4.0: each output is JSON {"translation": "...", "scores_raw": "{...}"}
   const leaderReceipts = consensusData.leader_receipt || [];
   if (leaderReceipts.length > 0) {
     const eqOutputs = leaderReceipts[0]?.eq_outputs || {};
-    // eq_outputs["0"] is the first translation candidate
     const firstOutput = eqOutputs['0'] || eqOutputs[0];
-    if (firstOutput?.payload?.readable) {
-      finalTranslation = stripQuotes(firstOutput.payload.readable);
-    }
-
-    // Try to extract quality scores from eq_outputs (the scoring step)
-    for (const key of Object.keys(eqOutputs)) {
-      const payload = eqOutputs[key]?.payload?.readable;
-      if (payload && payload.includes('semantic_score')) {
-        try {
-          const scores = JSON.parse(stripQuotes(payload));
-          if (scores.semantic_score) {
-            return buildResult(txHash, finalTranslation, scores, consensusData);
+    const raw = firstOutput?.payload?.readable;
+    if (raw) {
+      try {
+        const parsed = JSON.parse(stripQuotes(raw));
+        if (parsed.translation) {
+          finalTranslation = parsed.translation.trim();
+          // Parse the embedded scores_raw JSON
+          const scoresRaw = parsed.scores_raw;
+          if (scoresRaw) {
+            try {
+              parsedScores = JSON.parse(scoresRaw);
+            } catch {
+              // scores_raw might have extra text — extract JSON block
+              const match = String(scoresRaw).match(/\{[\s\S]*\}/);
+              if (match) parsedScores = JSON.parse(match[0]);
+            }
           }
-        } catch {}
+        }
+      } catch {
+        // v3.3.0 or plain string output — treat as raw translation
+        finalTranslation = stripQuotes(raw);
       }
     }
   }
 
-  // Fallback: derive scores from votes
+  // If we got real scores from the contract, use them
+  if (parsedScores && (parsedScores.semantic || parsedScores.tone || parsedScores.fluency)) {
+    const semantic  = clamp(parsedScores.semantic  || parsedScores.semantic_score  || 80);
+    const tone      = clamp(parsedScores.tone      || parsedScores.tone_score      || 80);
+    const cultural  = clamp(parsedScores.cultural  || parsedScores.cultural_score  || 80);
+    const fluency   = clamp(parsedScores.fluency   || parsedScores.fluency_score   || 80);
+    const confidence = parseFloat(((semantic + tone + cultural + fluency) / 4).toFixed(1));
+
+    const votes = consensusData.votes || {};
+    const validators = Object.entries(votes).map(([, vote], i) => ({
+      agentId: i + 1,
+      translation: finalTranslation,
+      confidence: vote === 'agree' ? confidence : confidence * 0.6,
+      semantic,
+      tone,
+      cultural,
+      isConsensus: vote === 'agree',
+    }));
+
+    return {
+      finalTranslation,
+      confidenceScore: confidence,
+      semanticScore: semantic,
+      toneScore: tone,
+      culturalScore: cultural,
+      txHash,
+      agents: validators.length > 0 ? validators : [{
+        agentId: 1, translation: finalTranslation, confidence, semantic, tone, cultural, isConsensus: true,
+      }],
+    };
+  }
+
+  // Fallback: derive scores from vote consensus ratio
   const votes = consensusData.votes || {};
   const voteValues = Object.values(votes) as string[];
   const agreeCount = voteValues.filter(v => v === 'agree').length;
   const total = voteValues.length || 1;
-  const confidenceScore = Math.min(100, (agreeCount / total) * 100) || 80;
+  const confidenceScore = Math.min(100, Math.round((agreeCount / total) * 100)) || 80;
 
-  const validators = consensusData.validators || [];
-  const agents = validators
-    .filter((v: any) => v.vote === 'agree')
-    .map((v: any, i: number) => ({
-      agentId: i + 1,
-      translation: finalTranslation,
-      confidence: confidenceScore,
-      semantic: confidenceScore * 0.96,
-      tone: confidenceScore * 0.91,
-      cultural: confidenceScore * 0.88,
-      isConsensus: true,
-    }));
+  const agents = voteValues.map((vote, i) => ({
+    agentId: i + 1,
+    translation: finalTranslation,
+    confidence: vote === 'agree' ? confidenceScore : confidenceScore * 0.6,
+    semantic: confidenceScore * 0.96,
+    tone: confidenceScore * 0.91,
+    cultural: confidenceScore * 0.88,
+    isConsensus: vote === 'agree',
+  }));
 
   return {
     finalTranslation,
@@ -302,13 +340,9 @@ function parseResult(txHash: string, receipt: any): TranslationConsensusResult {
     culturalScore: confidenceScore * 0.88,
     txHash,
     agents: agents.length > 0 ? agents : [{
-      agentId: 1,
-      translation: finalTranslation,
-      confidence: confidenceScore,
-      semantic: confidenceScore * 0.96,
-      tone: confidenceScore * 0.91,
-      cultural: confidenceScore * 0.88,
-      isConsensus: true,
+      agentId: 1, translation: finalTranslation, confidence: confidenceScore,
+      semantic: confidenceScore * 0.96, tone: confidenceScore * 0.91,
+      cultural: confidenceScore * 0.88, isConsensus: true,
     }],
   };
 }
