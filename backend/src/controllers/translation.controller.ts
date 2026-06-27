@@ -263,7 +263,15 @@ export async function extractFile(req: AuthRequest, res: Response) {
       return sendSuccess(res, { text: extracted, filename });
     }
 
-    return sendError(res, 'DOCX extraction is not yet supported. Please copy and paste the text directly.', 422);
+    if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || filename.endsWith('.docx')) {
+      const mammoth = (await import('mammoth')).default;
+      const { value } = await mammoth.extractRawText({ buffer });
+      const extracted = (value || '').trim();
+      if (!extracted) return sendError(res, 'No text found in DOCX file.', 422);
+      return sendSuccess(res, { text: extracted, filename });
+    }
+
+    return sendError(res, 'Unsupported file type. Please upload a TXT, PDF, or DOCX file.', 422);
   } catch (err: any) {
     logger.error('File extraction failed', { filename, error: err?.message });
     return sendError(res, 'File extraction failed. The file may be corrupted or password-protected.', 500);

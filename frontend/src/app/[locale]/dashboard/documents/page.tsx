@@ -7,7 +7,7 @@ import { translationApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
-const ACCEPTED = ['.txt', '.pdf'];
+const ACCEPTED = ['.txt', '.pdf', '.docx'];
 
 export default function DocumentsPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -77,7 +77,7 @@ export default function DocumentsPage() {
         <input
           ref={inputRef}
           type="file"
-          accept=".txt,.pdf"
+          accept=".txt,.pdf,.docx"
           className="hidden"
           onChange={e => e.target.files?.[0] && validateAndSet(e.target.files[0])}
         />
@@ -87,7 +87,7 @@ export default function DocumentsPage() {
           </div>
           <div>
             <p className="font-semibold text-foreground">Drop a file here or click to browse</p>
-            <p className="text-sm text-muted-foreground mt-1">Supports TXT and PDF (text-based)</p>
+            <p className="text-sm text-muted-foreground mt-1">Supports TXT, PDF, and DOCX</p>
           </div>
         </div>
       </div>
@@ -116,10 +116,11 @@ export default function DocumentsPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-muted-foreground">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-muted-foreground">
         {[
           { icon: '📄', label: 'TXT files', desc: 'Plain text, extracted instantly' },
           { icon: '📑', label: 'PDF files', desc: 'Text-based PDFs (not scanned)' },
+          { icon: '📝', label: 'DOCX files', desc: 'Microsoft Word documents' },
         ].map(item => (
           <div key={item.label} className="flex items-start gap-3 rounded-xl border border-[#d4cfc0] bg-white/40 p-4">
             <span className="text-xl">{item.icon}</span>
