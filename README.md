@@ -61,7 +61,7 @@ Express API (TypeScript · Fly.io)
        ├── Redis — rate limiting
        └── GenLayer StudioNet
               │
-              └── Intelligent Contract v3.3.0 (Python)
+              └── Intelligent Contract v3.4.0 (Python)
                      │
                      ├── Validator 1 → LLM call → translation
                      ├── Validator 2 → LLM call → translation
@@ -140,7 +140,7 @@ Linguara/
 
 **File:** `contracts/linguara_translation.py`  
 **Network:** GenLayer StudioNet  
-**Contract address:** `0xB4aB5410D024BbDaC3D8Ecc0d00B868750721408`
+**Contract address:** `0xf7650B3718414F14c389022DED2aFc4C8B2C6779`
 
 ### Design philosophy
 
@@ -259,7 +259,7 @@ JWT_REFRESH_SECRET=
 JWT_ACCESS_EXPIRES=15m
 JWT_REFRESH_EXPIRES=7d
 WALLET_MASTER_KEY=
-GENLAYER_CONTRACT_ADDRESS=0xB4aB5410D024BbDaC3D8Ecc0d00B868750721408
+GENLAYER_CONTRACT_ADDRESS=0xf7650B3718414F14c389022DED2aFc4C8B2C6779
 GENLAYER_PRIVATE_KEY=
 GENLAYER_RPC_URL=
 BREVO_API_KEY=
@@ -399,8 +399,8 @@ Auto-deploys on every push to `main`. Set `NEXT_PUBLIC_API_URL` in the Vercel da
 ### Feature checklist
 
 **Smart Contract**
-- [x] Intelligent Contract v3.3.0 on GenLayer StudioNet
-- [x] 1 LLM call per validator (down from 6 — eliminates timeouts)
+- [x] Intelligent Contract v3.4.0 on GenLayer StudioNet
+- [x] 2 LLM calls per validator: translate + quality score (semantic, tone, cultural, fluency)
 - [x] `gl.eq_principle.prompt_comparative` consensus
 - [x] 70+ languages, 10 domains with domain-specific prompting
 - [x] Glossary injection into translation prompt
