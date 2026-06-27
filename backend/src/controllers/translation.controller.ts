@@ -278,6 +278,30 @@ export async function extractFile(req: AuthRequest, res: Response) {
   }
 }
 
+export async function getChainStatus(req: AuthRequest, res: Response) {
+  try {
+    const translation = await prisma.translation.findFirst({
+      where: { id: req.params.id, userId: req.user!.userId },
+      select: { contractTxHash: true, status: true },
+    });
+    if (!translation) return sendError(res, 'Translation not found', 404);
+    if (!translation.contractTxHash) {
+      return sendSuccess(res, { dbStatus: translation.status, chainStatus: null });
+    }
+
+    const { getTransactionStatus } = await import('../services/genLayer.service');
+    const receipt = await getTransactionStatus(translation.contractTxHash);
+    return sendSuccess(res, {
+      dbStatus: translation.status,
+      txHash: translation.contractTxHash,
+      chainStatus: receipt?.status ?? null,
+      receipt: receipt ?? null,
+    });
+  } catch {
+    return sendError(res, 'Failed to fetch chain status', 500);
+  }
+}
+
 export async function rateTranslation(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const { rating } = req.body;

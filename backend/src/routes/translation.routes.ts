@@ -20,6 +20,7 @@ router.post('/extract-file', translation.extractFile);
 router.get('/', translation.listTranslations);
 router.get('/audit', translation.getAuditLog);
 router.get('/:id', translation.getTranslation);
+router.get('/:id/chain-status', translation.getChainStatus);
 router.post('/:id/rate', [
   body('rating').isInt({ min: 1, max: 5 }),
 ], validate, translation.rateTranslation);

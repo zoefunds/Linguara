@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translationApi } from '@/lib/api';
+import { ChainStatusTracker } from '@/components/dashboard/chain-status-tracker';
 import { toast } from '@/hooks/use-toast';
 import { cn, getConfidenceColor, getConfidenceBg } from '@/lib/utils';
 
@@ -59,6 +60,7 @@ export default function TranslatePage() {
   const [showContext, setShowContext] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [translationId, setTranslationId] = useState<string | null>(null);
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [rating, setRating] = useState(0);
@@ -86,6 +88,7 @@ export default function TranslatePage() {
     setStatus('SUBMITTING');
     setResult(null);
     setTxHash(null);
+    setTranslationId(null);
     setRating(0);
     setRatingSubmitted(false);
 
@@ -95,6 +98,7 @@ export default function TranslatePage() {
 
       const { data } = await translationApi.create(payload);
       const { translationId } = data.data;
+      setTranslationId(translationId);
       setStatus('PENDING');
 
       const finalResult = await pollBackend(translationId, (s, hash) => {
@@ -284,7 +288,7 @@ export default function TranslatePage() {
               <div className="h-56 flex flex-col items-center justify-center gap-3 text-muted-foreground">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 <p className="text-sm font-medium">{STATUS_LABELS[status!]}</p>
-                <p className="text-xs opacity-60">GenLayer consensus can take 10–20 minutes — please keep this tab open</p>
+                <p className="text-xs opacity-60">Keep this tab open — consensus takes 10–20 min</p>
               </div>
             ) : result ? (
               <div className="h-56 overflow-auto text-sm leading-relaxed whitespace-pre-wrap">
@@ -298,6 +302,15 @@ export default function TranslatePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Chain status tracker — visible while processing or after tx hash known */}
+      {(isProcessing || txHash) && translationId && (
+        <ChainStatusTracker
+          translationId={translationId}
+          txHash={txHash}
+          active={isProcessing}
+        />
+      )}
 
       {/* Submit + tx link */}
       <div className="flex flex-wrap justify-between items-center gap-4">

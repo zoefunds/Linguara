@@ -77,6 +77,7 @@ export const translationApi = {
     api.post('/translations/extract-file', data),
   rate: (id: string, rating: number) =>
     api.post(`/translations/${id}/rate`, { rating }),
+  chainStatus: (id: string) => api.get(`/translations/${id}/chain-status`),
 };
 
 // Glossary
