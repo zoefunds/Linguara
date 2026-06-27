@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
 import { Clock, CheckCircle2, XCircle, Loader2, ArrowRight, ExternalLink, ChevronDown, ChevronUp, Copy, Check, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -105,10 +106,14 @@ function TranslationCard({ t }: { t: any }) {
   );
 }
 
+const PAGE_SIZE = 10;
+
 export default function HistoryPage() {
+  const [page, setPage] = useState(1);
+
   const { data, isLoading } = useQuery({
-    queryKey: ['translations'],
-    queryFn: () => translationApi.list(1, 50).then(r => r.data),
+    queryKey: ['translations', page],
+    queryFn: () => translationApi.list(page, PAGE_SIZE).then(r => r.data),
   });
 
   if (isLoading) return (
@@ -118,14 +123,19 @@ export default function HistoryPage() {
   );
 
   const translations = data?.data || [];
+  const total = data?.pagination?.total || 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">{data?.pagination?.total || 0} translations</p>
+        <p className="text-sm text-muted-foreground">{total} translation{total !== 1 ? 's' : ''}</p>
+        {totalPages > 1 && (
+          <p className="text-xs text-muted-foreground">Page {page} of {totalPages}</p>
+        )}
       </div>
 
-      {translations.length === 0 ? (
+      {translations.length === 0 && page === 1 ? (
         <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl p-12 text-center space-y-3">
           <Clock className="h-10 w-10 text-muted-foreground mx-auto" />
           <p className="text-muted-foreground">No translations yet</p>
@@ -138,6 +148,54 @@ export default function HistoryPage() {
           {translations.map((t: any) => (
             <TranslationCard key={t.id} t={t} />
           ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full border-[#d4cfc0]"
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            Previous
+          </Button>
+          <div className="flex gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+              .reduce<(number | '…')[]>((acc, p, i, arr) => {
+                if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('…');
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, i) =>
+                p === '…' ? (
+                  <span key={`ellipsis-${i}`} className="w-8 text-center text-muted-foreground text-sm self-center">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p as number)}
+                    className={cn(
+                      'w-8 h-8 rounded-full text-sm font-medium transition-all',
+                      page === p ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-white/60'
+                    )}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full border-[#d4cfc0]"
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            Next
+          </Button>
         </div>
       )}
     </div>

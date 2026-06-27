@@ -101,26 +101,31 @@ export async function sendTranslationTx(
   sourceLanguage: string,
   targetLanguage: string,
   domain: string,
-  senderAddress: string
+  senderAddress: string,
+  glossaryTerms: { sourceTerm: string; targetTerm: string }[] = []
 ): Promise<string> {
   if (!CONTRACT) throw new Error('GENLAYER_CONTRACT_ADDRESS not configured');
+
+  // Serialise glossary as a JSON string so the contract can parse it
+  const glossaryJson = glossaryTerms.length
+    ? JSON.stringify(glossaryTerms.map(t => ({ src: t.sourceTerm, tgt: t.targetTerm })))
+    : '[]';
 
   const chunks = splitIntoChunks(sourceText);
 
   if (chunks.length === 1) {
-    // Fast path: single transaction (unchanged behaviour for short texts)
     const client = await getGLClient(userPrivateKey);
     const txHash = await client.writeContract({
       address: CONTRACT,
       functionName: 'translate_text',
-      args: [translationId, sourceText, sourceLanguage || 'auto', targetLanguage, domain || 'general', senderAddress],
+      args: [translationId, sourceText, sourceLanguage || 'auto', targetLanguage, domain || 'general', senderAddress, glossaryJson],
       value: 0n,
     });
-    logger.info('GenLayer tx submitted (single chunk)', { txHash, translationId });
+    logger.info('GenLayer tx submitted (single chunk)', { txHash, translationId, glossaryTerms: glossaryTerms.length });
     return txHash;
   }
 
-  // Multi-chunk path: submit each chunk as a separate tx, return JSON metadata
+  // Multi-chunk path
   logger.info('Long text detected, splitting into chunks', {
     translationId,
     totalChars: sourceText.length,
@@ -134,7 +139,7 @@ export async function sendTranslationTx(
       const txHash = await client.writeContract({
         address: CONTRACT,
         functionName: 'translate_text',
-        args: [chunkId, chunk, sourceLanguage || 'auto', targetLanguage, domain || 'general', senderAddress],
+        args: [chunkId, chunk, sourceLanguage || 'auto', targetLanguage, domain || 'general', senderAddress, glossaryJson],
         value: 0n,
       });
       logger.info('GenLayer chunk submitted', { txHash, chunkId, index: i });
@@ -142,7 +147,6 @@ export async function sendTranslationTx(
     })
   );
 
-  // Return a JSON sentinel so pollUntilFinalized knows to handle multiple hashes
   return JSON.stringify({ multi: true, hashes: chunkHashes, count: chunks.length });
 }
 

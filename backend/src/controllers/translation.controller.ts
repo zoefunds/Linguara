@@ -60,12 +60,19 @@ export async function createTranslation(req: AuthRequest, res: Response) {
       },
     });
 
+    // Fetch glossary terms for this language pair to pass to the contract
+    const glossaryTerms = await prisma.glossaryTerm.findMany({
+      where: { userId: req.user!.userId, targetLang: targetLanguage },
+      select: { sourceTerm: true, targetTerm: true },
+    });
+
     // Fire GenLayer call fully async after response is sent
     submitToGenLayer(translation.id, req.user!.userId, userPrivateKey, senderAddress, {
       sourceText,
       targetLanguage,
       sourceLanguage: sourceLanguage || 'auto',
       domain: domain || 'general',
+      glossaryTerms,
     });
   } catch (err) {
     logger.error('Create translation error', { err });
@@ -78,7 +85,7 @@ async function submitToGenLayer(
   userId: string,
   userPrivateKey: string,
   senderAddress: string,
-  params: { sourceText: string; targetLanguage: string; sourceLanguage: string; domain: string }
+  params: { sourceText: string; targetLanguage: string; sourceLanguage: string; domain: string; glossaryTerms?: { sourceTerm: string; targetTerm: string }[] }
 ) {
   try {
     await prisma.translation.update({
@@ -93,7 +100,8 @@ async function submitToGenLayer(
       params.sourceLanguage,
       params.targetLanguage,
       params.domain,
-      senderAddress
+      senderAddress,
+      params.glossaryTerms || []
     );
 
     // For multi-chunk, store the first hash so the explorer link works
