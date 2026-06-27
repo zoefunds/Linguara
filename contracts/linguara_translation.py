@@ -1,7 +1,7 @@
 # Linguara Translation Intelligent Contract
 # Platform: Linguara — Trustworthy Multilingual Translation Through Decentralized AI Consensus
 # Deploy to: GenLayer Studio → StudioNet
-# Version: 3.2.0
+# Version: 3.3.0
 #
 # Architecture:
 #   - Single LLM call per validator via gl.nondet.exec_prompt()
@@ -254,7 +254,7 @@ class LinguaraTranslation(gl.Contract):
             owner_address: Hex address of the contract owner/deployer.
         """
         self.total_translations = u256(0)
-        self.contract_version = "3.2.0"
+        self.contract_version = "3.3.0"
         self.owner_address = owner_address
         self.paused = False
 
@@ -271,6 +271,7 @@ class LinguaraTranslation(gl.Contract):
         target_language: str,
         domain: str,
         requestor_address: str,
+        glossary_json: str = '[]',
     ) -> None:
         """
         Translate source_text and store the consensus result on-chain.
@@ -291,6 +292,7 @@ class LinguaraTranslation(gl.Contract):
             target_language:   BCP-47 code (must be in SUPPORTED_LANGUAGES).
             domain:            Translation domain — legal/medical/technical/etc.
             requestor_address: Caller wallet address for on-chain attribution.
+            glossary_json:     JSON array of {src, tgt} term pairs from user glossary.
         """
         if self.paused:
             raise Exception("Contract is paused")
@@ -314,11 +316,25 @@ class LinguaraTranslation(gl.Contract):
         tgt_label = SUPPORTED_LANGUAGES.get(target_language, target_language)
         domain_instruction = DOMAIN_INSTRUCTIONS.get(domain, DOMAIN_INSTRUCTIONS["general"])
 
+        # Build optional glossary block
+        glossary_block = ""
+        try:
+            terms = json.loads(glossary_json) if glossary_json else []
+            if terms:
+                lines = "\n".join(f'  - "{t["src"]}" → "{t["tgt"]}"' for t in terms if "src" in t and "tgt" in t)
+                glossary_block = (
+                    f"\nUser-defined glossary (you MUST use these exact translations for the listed terms):\n"
+                    f"{lines}\n"
+                )
+        except Exception:
+            glossary_block = ""
+
         prompt = (
             f"You are a professional translator. "
             f"Translate the following text from {src_label} to {tgt_label}.\n\n"
             f"Domain: {domain}\n"
-            f"Instructions: {domain_instruction}\n\n"
+            f"Instructions: {domain_instruction}\n"
+            f"{glossary_block}\n"
             f"Rules:\n"
             f"- Output ONLY the translated text. No explanations, no notes, no preamble.\n"
             f"- Preserve all formatting, paragraph breaks, bullet points, and structure.\n"

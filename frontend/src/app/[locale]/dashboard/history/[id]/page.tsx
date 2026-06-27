@@ -1,10 +1,11 @@
 'use client';
-import { use } from 'react';
+import { useState } from 'react';
+import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
   ArrowLeft, CheckCircle2, XCircle, Loader2, ExternalLink,
-  Copy, Check, Download, Star, ArrowRight,
+  Copy, Check, Download, ArrowRight,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { translationApi } from '@/lib/api';
 import { formatDate, getConfidenceColor, getConfidenceBg, cn } from '@/lib/utils';
-import { useState } from 'react';
 
 function ScoreBar({ label, value }: { label: string; value: number }) {
   return (
@@ -26,8 +26,8 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-export default function TranslationDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function TranslationDetailPage() {
+  const { id } = useParams<{ id: string }>();
   const [copied, setCopied] = useState<'source' | 'translation' | null>(null);
 
   const { data, isLoading } = useQuery({
