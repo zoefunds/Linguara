@@ -44,6 +44,7 @@ model User {
   wallet            Wallet?
   translations      Translation[]
   auditLogs         AuditLog[]
+  glossaryTerms     GlossaryTerm[]
 
   @@map("users")
 }
@@ -136,4 +137,23 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+
+model GlossaryTerm {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  sourceTerm   String   @map("source_term")
+  targetTerm   String   @map("target_term")
+  sourceLang   String   @default("en") @map("source_lang")
+  targetLang   String   @map("target_lang")
+  domain       String   @default("general")
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([targetLang])
+  @@map("glossary_terms")
 }

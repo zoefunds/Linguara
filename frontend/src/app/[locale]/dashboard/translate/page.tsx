@@ -124,15 +124,37 @@ export default function TranslatePage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleExport = () => {
+  const handleExport = async (format: 'txt' | 'pdf' = 'txt') => {
     if (!result) return;
-    const blob = new Blob([result.finalTranslation], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `translation_${targetLang}_${Date.now()}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (format === 'txt') {
+      const blob = new Blob([result.finalTranslation], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `translation_${targetLang}_${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      const margin = 20;
+      const pageW = doc.internal.pageSize.getWidth();
+      const maxW = pageW - margin * 2;
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Linguara Translation', margin, margin + 4);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(120, 110, 100);
+      doc.text(`Target language: ${targetLang.toUpperCase()}  |  ${new Date().toLocaleDateString()}`, margin, margin + 12);
+      doc.setDrawColor(200, 195, 185);
+      doc.line(margin, margin + 16, pageW - margin, margin + 16);
+      doc.setTextColor(30, 25, 20);
+      doc.setFontSize(11);
+      const lines = doc.splitTextToSize(result.finalTranslation, maxW);
+      doc.text(lines, margin, margin + 26);
+      doc.save(`translation_${targetLang}_${Date.now()}.pdf`);
+    }
   };
 
   const handleRate = async (stars: number) => {
@@ -247,8 +269,11 @@ export default function TranslatePage() {
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopy}>
                     {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExport}>
-                    <Download className="h-3.5 w-3.5" />
+                  <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs px-2" onClick={() => handleExport('txt')}>
+                    <Download className="h-3.5 w-3.5" />TXT
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs px-2" onClick={() => handleExport('pdf')}>
+                    <Download className="h-3.5 w-3.5" />PDF
                   </Button>
                 </div>
               )}

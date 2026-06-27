@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Languages, Clock, FileText, Shield, Wallet, Settings, BarChart3, LogOut } from 'lucide-react';
+import { Languages, Clock, FileText, Shield, Wallet, Settings, BarChart3, LogOut, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -9,6 +9,7 @@ const navItems = [
   { href: '/dashboard/translate', icon: Languages, label: 'Translate' },
   { href: '/dashboard/history', icon: Clock, label: 'History' },
   { href: '/dashboard/documents', icon: FileText, label: 'Documents' },
+  { href: '/dashboard/glossary', icon: BookOpen, label: 'Glossary' },
   { href: '/dashboard/audit', icon: Shield, label: 'Audit Trail' },
   { href: '/dashboard/reports', icon: BarChart3, label: 'Reports' },
   { href: '/dashboard/wallet', icon: Wallet, label: 'Wallet' },

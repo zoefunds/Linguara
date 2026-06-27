@@ -10,6 +10,7 @@ const titles: Record<string, string> = {
   translate: 'Translation Workspace',
   history: 'Translation History',
   documents: 'Documents',
+  glossary: 'Glossary',
   audit: 'Audit Trail',
   reports: 'Reports',
   wallet: 'Wallet',

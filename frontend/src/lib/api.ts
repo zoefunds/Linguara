@@ -78,3 +78,11 @@ export const translationApi = {
   rate: (id: string, rating: number) =>
     api.post(`/translations/${id}/rate`, { rating }),
 };
+
+// Glossary
+export const glossaryApi = {
+  list: () => api.get('/glossary'),
+  create: (data: { sourceTerm: string; targetTerm: string; sourceLang?: string; targetLang: string; domain?: string; notes?: string }) =>
+    api.post('/glossary', data),
+  delete: (id: string) => api.delete(`/glossary/${id}`),
+};

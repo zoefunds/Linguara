@@ -256,10 +256,9 @@ export async function extractFile(req: AuthRequest, res: Response) {
     }
 
     if (mimeType === 'application/pdf' || filename.endsWith('.pdf')) {
-      const { PDFParse } = await import('pdf-parse');
-      const parser = new PDFParse({ data: buffer } as any);
-      const text = await (parser as any).getText();
-      const extracted = (typeof text === 'string' ? text : '').trim();
+      const pdfParse = (await import('pdf-parse')).default;
+      const result = await pdfParse(buffer);
+      const extracted = (result.text || '').trim();
       if (!extracted) return sendError(res, 'No text found in PDF. The file may be scanned or image-based.', 422);
       return sendSuccess(res, { text: extracted, filename });
     }
