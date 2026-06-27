@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 
 const STAGES = [
   { key: 'PENDING',    label: 'Pending',    desc: 'Transaction submitted to GenLayer' },
-  { key: 'PROPOSING',  label: 'Proposing',  desc: 'Leader validator generating translation' },
+  { key: 'PROPOSING',  label: 'Proposing',  desc: 'Validators generating translations' },
   { key: 'COMMITTING', label: 'Committing', desc: 'Validators committing their votes' },
   { key: 'REVEALING',  label: 'Revealing',  desc: 'Validators revealing results' },
   { key: 'ACCEPTED',   label: 'Accepted',   desc: 'Consensus reached on-chain' },

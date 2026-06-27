@@ -7,6 +7,21 @@ import { sendTranslationCompleteEmail } from '../services/email.service';
 import { decryptPrivateKey } from '../utils/wallet';
 import { logger } from '../config/logger';
 
+// If the contract returned raw JSON {"translation":"...","scores_raw":"..."}, extract just the text.
+function cleanTranslation(raw: string | null): string | null {
+  if (!raw) return raw;
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed.translation && typeof parsed.translation === 'string') {
+        return parsed.translation.trim();
+      }
+    } catch {}
+  }
+  return raw;
+}
+
 export async function createTranslation(req: AuthRequest, res: Response) {
   const { sourceText, targetLanguage, sourceLanguage, domain, documentType } = req.body;
 
@@ -170,7 +185,7 @@ async function pollAndSaveResult(translationId: string, userId: string, txHash: 
     where: { id: translationId },
     data: {
       status: 'COMPLETED',
-      finalTranslation: result.finalTranslation,
+      finalTranslation: cleanTranslation(result.finalTranslation),
       confidenceScore: result.confidenceScore,
       contractTxHash: result.txHash,
       completedAt: new Date(),
@@ -202,7 +217,7 @@ export async function getTranslation(req: AuthRequest, res: Response) {
       include: { results: true },
     });
     if (!translation) return sendError(res, 'Translation not found', 404);
-    return sendSuccess(res, translation);
+    return sendSuccess(res, { ...translation, finalTranslation: cleanTranslation(translation.finalTranslation) });
   } catch {
     return sendError(res, 'Failed to fetch translation', 500);
   }
@@ -224,7 +239,8 @@ export async function listTranslations(req: AuthRequest, res: Response) {
       }),
       prisma.translation.count({ where: { userId: req.user!.userId } }),
     ]);
-    return sendPaginated(res, items, total, page, limit);
+    const cleaned = items.map(t => ({ ...t, finalTranslation: cleanTranslation(t.finalTranslation) }));
+    return sendPaginated(res, cleaned, total, page, limit);
   } catch {
     return sendError(res, 'Failed to list translations', 500);
   }
