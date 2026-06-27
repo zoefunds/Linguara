@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Clock, CheckCircle2, XCircle, Loader2, ArrowRight, ExternalLink, ChevronDown, ChevronUp, Copy, Check, Eye } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { translationApi } from '@/lib/api';
