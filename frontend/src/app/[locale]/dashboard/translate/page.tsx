@@ -45,7 +45,7 @@ interface TranslationResult {
 const STATUS_LABELS: Record<string, string> = {
   SUBMITTING: 'Submitting to GenLayer...',
   PENDING: 'Transaction queued on-chain...',
-  PROCESSING: 'AI validators reaching consensus...',
+  PROCESSING: 'AI validators reaching consensus — this can take 10–20 min...',
   COMPLETED: 'Verified on-chain!',
   FAILED: 'Translation failed',
 };
@@ -284,7 +284,7 @@ export default function TranslatePage() {
               <div className="h-56 flex flex-col items-center justify-center gap-3 text-muted-foreground">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 <p className="text-sm font-medium">{STATUS_LABELS[status!]}</p>
-                <p className="text-xs opacity-60">AI validators are reaching on-chain consensus</p>
+                <p className="text-xs opacity-60">GenLayer consensus can take 10–20 minutes — please keep this tab open</p>
               </div>
             ) : result ? (
               <div className="h-56 overflow-auto text-sm leading-relaxed whitespace-pre-wrap">
@@ -402,8 +402,9 @@ async function pollBackend(
   translationId: string,
   onUpdate: (status: string, txHash: string | null) => void
 ): Promise<TranslationResult | null> {
-  for (let i = 0; i < 90; i++) {
-    await new Promise(r => setTimeout(r, 4000));
+  // Poll for up to 30 minutes (360 × 5s). GenLayer consensus can take 10-20 min.
+  for (let i = 0; i < 360; i++) {
+    await new Promise(r => setTimeout(r, 5000));
     try {
       const { data } = await translationApi.get(translationId);
       const t = data.data;
@@ -420,8 +421,9 @@ async function pollBackend(
           agents: t.results || [],
         };
       }
+      // Only stop on FAILED — never on a timeout that backend may recover from
       if (t.status === 'FAILED') return null;
-    } catch { /* keep polling */ }
+    } catch { /* keep polling — network blip should not stop us */ }
   }
   return null;
 }

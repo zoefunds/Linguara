@@ -196,8 +196,8 @@ export async function pollUntilFinalized(txHashOrMeta: string): Promise<Translat
           client.waitForTransactionReceipt({
             hash: hash as `0x${string}`,
             status: 'ACCEPTED',
-            interval: 4000,
-            retries: 90,
+            interval: 6000,
+            retries: 300,
           })
         )
       );
@@ -230,8 +230,8 @@ export async function pollUntilFinalized(txHashOrMeta: string): Promise<Translat
     const receipt = await client.waitForTransactionReceipt({
       hash: txHashOrMeta as `0x${string}`,
       status: 'ACCEPTED',
-      interval: 4000,
-      retries: 90,
+      interval: 6000,
+      retries: 300,
     });
     logger.info('GenLayer tx accepted', { txHash: txHashOrMeta, receipt: JSON.stringify(receipt).slice(0, 200) });
     return parseResult(txHashOrMeta, receipt);
