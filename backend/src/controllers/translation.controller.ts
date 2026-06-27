@@ -270,3 +270,22 @@ export async function extractFile(req: AuthRequest, res: Response) {
     return sendError(res, 'File extraction failed. The file may be corrupted or password-protected.', 500);
   }
 }
+
+export async function rateTranslation(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const { rating } = req.body;
+  if (!rating || rating < 1 || rating > 5) return sendError(res, 'Rating must be between 1 and 5', 400);
+  try {
+    const translation = await prisma.translation.findFirst({
+      where: { id, userId: req.user!.userId },
+    });
+    if (!translation) return sendError(res, 'Translation not found', 404);
+    await prisma.translation.update({
+      where: { id },
+      data: { userRating: rating } as any,
+    });
+    return sendSuccess(res, { rating });
+  } catch {
+    return sendError(res, 'Failed to submit rating', 500);
+  }
+}

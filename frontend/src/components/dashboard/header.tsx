@@ -4,6 +4,7 @@ import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/store/auth.store';
+import { MobileSidebar } from './mobile-sidebar';
 
 const titles: Record<string, string> = {
   translate: 'Translation Workspace',
@@ -23,9 +24,7 @@ export function DashboardHeader() {
   return (
     <header className="h-16 border-b border-[#d4cfc0] bg-[#efece4]/95 backdrop-blur flex items-center justify-between px-6 sticky top-0 z-30">
       <div className="flex items-center gap-3">
-        <div className="md:hidden">
-          <img src="/logo.png" alt="Linguara" className="h-7 w-7 rounded-lg" />
-        </div>
+        <MobileSidebar />
         <h1 className="font-semibold text-foreground">{titles[segment] || 'Dashboard'}</h1>
       </div>
 

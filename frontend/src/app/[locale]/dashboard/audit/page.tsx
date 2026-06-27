@@ -33,7 +33,7 @@ export default function AuditPage() {
       <p className="text-sm text-muted-foreground">{logs.length} audit events</p>
 
       {logs.length === 0 ? (
-        <Card className="border-border/50 p-12 text-center space-y-3">
+        <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl p-12 text-center space-y-3">
           <Shield className="h-10 w-10 text-muted-foreground mx-auto" />
           <p className="text-muted-foreground">No audit events yet</p>
         </Card>
@@ -44,7 +44,7 @@ export default function AuditPage() {
             {logs.map((log: any) => (
               <div key={log.id} className="relative">
                 <div className="absolute -left-7 w-3 h-3 rounded-full bg-primary border-2 border-background" />
-                <Card className="border-border/50 p-4 space-y-2">
+                <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl p-4 space-y-2">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <Badge variant={(eventColors[log.eventType] as any) || 'secondary'} className="text-xs">
                       {log.eventType.replace(/_/g, ' ')}

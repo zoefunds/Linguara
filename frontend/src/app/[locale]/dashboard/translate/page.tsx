@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { Copy, Check, ExternalLink, Loader2, Zap } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Copy, Check, ExternalLink, Loader2, Zap, Download, ChevronDown, ChevronUp, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -39,12 +39,7 @@ interface TranslationResult {
   semanticScore: number;
   toneScore: number;
   txHash: string;
-  agents?: Array<{
-    agentId: number;
-    translatedText: string;
-    confidenceScore: number;
-    isConsensus: boolean;
-  }>;
+  agents?: Array<{ agentId: number; translatedText: string; confidenceScore: number; isConsensus: boolean }>;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -57,12 +52,29 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function TranslatePage() {
   const [sourceText, setSourceText] = useState('');
+  const [docName, setDocName] = useState<string | null>(null);
   const [targetLang, setTargetLang] = useState('fr');
   const [domain, setDomain] = useState('general');
+  const [context, setContext] = useState('');
+  const [showContext, setShowContext] = useState(false);
   const [status, setStatus] = useState<Status>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+
+  // Load document text passed from Documents page
+  useEffect(() => {
+    const text = sessionStorage.getItem('linguara_doc_text');
+    const name = sessionStorage.getItem('linguara_doc_name');
+    if (text) {
+      setSourceText(text);
+      setDocName(name);
+      sessionStorage.removeItem('linguara_doc_text');
+      sessionStorage.removeItem('linguara_doc_name');
+    }
+  }, []);
 
   const isProcessing = status === 'SUBMITTING' || status === 'PENDING' || status === 'PROCESSING';
 
@@ -71,13 +83,17 @@ export default function TranslatePage() {
       toast({ variant: 'destructive', title: 'Enter text to translate' });
       return;
     }
-
     setStatus('SUBMITTING');
     setResult(null);
     setTxHash(null);
+    setRating(0);
+    setRatingSubmitted(false);
 
     try {
-      const { data } = await translationApi.create({ sourceText, targetLanguage: targetLang, domain });
+      const payload: any = { sourceText, targetLanguage: targetLang, domain };
+      if (context.trim()) payload.context = context.trim();
+
+      const { data } = await translationApi.create(payload);
       const { translationId } = data.data;
       setStatus('PENDING');
 
@@ -108,19 +124,50 @@ export default function TranslatePage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleExport = () => {
+    if (!result) return;
+    const blob = new Blob([result.finalTranslation], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `translation_${targetLang}_${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRate = async (stars: number) => {
+    if (!result || ratingSubmitted) return;
+    setRating(stars);
+    try {
+      await translationApi.rate(result.translationId, stars);
+      setRatingSubmitted(true);
+      toast({ title: 'Rating submitted', description: 'Thank you for your feedback.' });
+    } catch {
+      toast({ variant: 'destructive', title: 'Could not submit rating' });
+    }
+  };
+
   const targetLangName = LANGUAGES.find(l => l.code === targetLang)?.name || 'Translation';
 
   return (
     <div className="max-w-6xl mx-auto space-y-5">
-      {/* Top controls bar */}
+
+      {/* Doc banner */}
+      {docName && (
+        <div className="flex items-center gap-2 text-sm bg-primary/10 border border-primary/20 text-primary rounded-xl px-4 py-2.5">
+          <span className="font-medium">📄 {docName}</span>
+          <span className="text-primary/60 text-xs ml-auto">{sourceText.length.toLocaleString()} chars extracted</span>
+        </div>
+      )}
+
+      {/* Controls */}
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Language selectors */}
           <Select value={targetLang} onValueChange={setTargetLang}>
             <SelectTrigger className="w-44 bg-white/60 border-[#d4cfc0] rounded-xl">
               <SelectValue placeholder="Target language" />
             </SelectTrigger>
-            <SelectContent className="z-50">
+            <SelectContent className="z-[9999]">
               {LANGUAGES.map(l => <SelectItem key={l.code} value={l.code}>{l.name}</SelectItem>)}
             </SelectContent>
           </Select>
@@ -129,13 +176,19 @@ export default function TranslatePage() {
             <SelectTrigger className="w-36 bg-white/60 border-[#d4cfc0] rounded-xl">
               <SelectValue placeholder="Domain" />
             </SelectTrigger>
-            <SelectContent className="z-50">
+            <SelectContent className="z-[9999]">
               {DOMAINS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
             </SelectContent>
           </Select>
+
+          <button
+            onClick={() => setShowContext(p => !p)}
+            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground border border-[#d4cfc0] bg-white/60 px-3 py-2 rounded-xl transition-all"
+          >
+            Context {showContext ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
         </div>
 
-        {/* Status badge */}
         {status && (
           <Badge
             variant={status === 'COMPLETED' ? 'success' : status === 'FAILED' ? 'destructive' : 'info'}
@@ -146,6 +199,23 @@ export default function TranslatePage() {
           </Badge>
         )}
       </div>
+
+      {/* Context input */}
+      {showContext && (
+        <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Context / tone hints (optional)</p>
+            <textarea
+              className="w-full h-16 bg-transparent text-sm resize-none outline-none placeholder:text-muted-foreground"
+              placeholder="e.g. This is a formal legal agreement between two companies. Maintain precise legal terminology."
+              value={context}
+              onChange={e => setContext(e.target.value)}
+              maxLength={500}
+            />
+            <p className="text-xs text-muted-foreground text-right">{context.length}/500</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Translation panes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -172,10 +242,13 @@ export default function TranslatePage() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">{targetLangName}</CardTitle>
               {result && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <Badge variant="success" className="text-xs">Consensus verified</Badge>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopy}>
                     {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExport}>
+                    <Download className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               )}
@@ -228,6 +301,26 @@ export default function TranslatePage() {
         )}
       </div>
 
+      {/* Rating */}
+      {result && (
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-muted-foreground font-medium">Rate this translation:</p>
+          <div className="flex gap-1">
+            {[1, 2, 3, 4, 5].map(star => (
+              <button
+                key={star}
+                onClick={() => handleRate(star)}
+                disabled={ratingSubmitted}
+                className={cn('transition-colors', ratingSubmitted ? 'cursor-default' : 'hover:text-amber-400')}
+              >
+                <Star className={cn('h-5 w-5', star <= rating ? 'fill-amber-400 text-amber-400' : 'text-[#d4cfc0]')} />
+              </button>
+            ))}
+          </div>
+          {ratingSubmitted && <span className="text-xs text-emerald-500 font-medium">Thank you!</span>}
+        </div>
+      )}
+
       {/* Confidence scores */}
       {result && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -247,7 +340,7 @@ export default function TranslatePage() {
         </div>
       )}
 
-      {/* Agent breakdown */}
+      {/* Validator breakdown */}
       {result?.agents && result.agents.length > 0 && (
         <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl">
           <CardHeader>
@@ -258,10 +351,7 @@ export default function TranslatePage() {
               {result.agents.map(agent => (
                 <div
                   key={agent.agentId}
-                  className={cn(
-                    'p-3 rounded-xl border text-sm',
-                    agent.isConsensus ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-[#d4cfc0]'
-                  )}
+                  className={cn('p-3 rounded-xl border text-sm', agent.isConsensus ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-[#d4cfc0]')}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-medium">Validator {agent.agentId}</span>
@@ -287,17 +377,12 @@ async function pollBackend(
   translationId: string,
   onUpdate: (status: string, txHash: string | null) => void
 ): Promise<TranslationResult | null> {
-  const maxAttempts = 90;
-
-  for (let i = 0; i < maxAttempts; i++) {
+  for (let i = 0; i < 90; i++) {
     await new Promise(r => setTimeout(r, 4000));
-
     try {
       const { data } = await translationApi.get(translationId);
       const t = data.data;
-
       onUpdate(t.status, t.contractTxHash || null);
-
       if (t.status === 'COMPLETED' && t.finalTranslation) {
         const consensus = t.results?.find((r: any) => r.isConsensus);
         return {
@@ -310,12 +395,8 @@ async function pollBackend(
           agents: t.results || [],
         };
       }
-
       if (t.status === 'FAILED') return null;
-    } catch {
-      // Network error — keep polling
-    }
+    } catch { /* keep polling */ }
   }
-
   return null;
 }

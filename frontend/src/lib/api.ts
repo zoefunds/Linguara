@@ -55,6 +55,8 @@ export const authApi = {
     api.post('/auth/reset-password', { token, password }),
   exportKey: (password: string) =>
     api.post('/auth/export-key', { password }),
+  verifyEmail: (token: string) =>
+    api.get(`/auth/verify-email?token=${token}`),
 };
 
 // Translations
@@ -73,4 +75,6 @@ export const translationApi = {
     api.get(`/translations/audit?page=${page}&limit=${limit}`),
   extractFile: (data: { base64: string; filename: string; mimeType: string }) =>
     api.post('/translations/extract-file', data),
+  rate: (id: string, rating: number) =>
+    api.post(`/translations/${id}/rate`, { rating }),
 };

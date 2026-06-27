@@ -1,12 +1,12 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Globe, Loader2, ArrowLeft, Mail } from 'lucide-react';
+import { Loader2, ArrowLeft, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { authApi } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
@@ -28,45 +28,75 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center space-y-2">
-          <Link href="/" className="inline-flex items-center gap-2 text-2xl font-bold text-primary">
-            <Globe className="h-7 w-7" /><span>Linguara</span>
-          </Link>
+    <div className="min-h-screen flex">
+      <div className="hidden lg:flex w-1/2 bg-[#1a1814] flex-col justify-between p-12">
+        <Link href="/" className="flex items-center gap-2">
+          <Image src="/logo.png" alt="Linguara" width={32} height={32} className="rounded-lg" />
+          <span className="text-white text-xl font-bold">Linguara</span>
+        </Link>
+        <div className="space-y-6">
+          <h2 className="text-4xl font-bold text-white leading-tight">Reset your password</h2>
+          <p className="text-[#a09880] text-lg">We'll send a secure link to your inbox so you can get back in.</p>
         </div>
-        <Card className="border-border/50 shadow-xl">
-          <CardHeader>
-            <CardTitle>Reset password</CardTitle>
-            <CardDescription>Enter your email to receive a reset link</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {sent ? (
-              <div className="text-center space-y-4 py-4">
-                <Mail className="h-12 w-12 text-primary mx-auto" />
-                <p className="text-sm text-muted-foreground">
-                  If that email is registered, a reset link has been sent. Check your inbox.
-                </p>
-                <Link href="/auth/login">
-                  <Button variant="outline" className="w-full"><ArrowLeft className="mr-2 h-4 w-4" />Back to login</Button>
-                </Link>
+        <p className="text-[#6b6456] text-sm">Linguara · AI-powered translation on GenLayer</p>
+      </div>
+
+      <div className="flex-1 bg-[#efece4] flex flex-col items-center justify-center p-8">
+        <div className="w-full max-w-md">
+          <div className="lg:hidden flex justify-center mb-8">
+            <Link href="/" className="flex items-center gap-2">
+              <Image src="/logo.png" alt="Linguara" width={28} height={28} className="rounded-lg" />
+              <span className="text-[#1a1814] text-xl font-bold">Linguara</span>
+            </Link>
+          </div>
+
+          {sent ? (
+            <div className="text-center space-y-6">
+              <div className="w-16 h-16 rounded-2xl bg-white border border-[#d4cfc0] flex items-center justify-center mx-auto shadow-sm">
+                <Mail className="h-8 w-8 text-primary" />
               </div>
-            ) : (
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div>
+                <h1 className="text-2xl font-bold text-[#1a1814]">Check your inbox</h1>
+                <p className="text-[#6b6456] mt-2">If that email is registered, a reset link has been sent.</p>
+              </div>
+              <Link href="/auth/login">
+                <Button variant="outline" className="w-full rounded-full border-[#d4cfc0] bg-white/70 hover:bg-white gap-2">
+                  <ArrowLeft className="h-4 w-4" />Back to login
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              <div>
+                <h1 className="text-2xl font-bold text-[#1a1814]">Forgot password?</h1>
+                <p className="text-[#6b6456] mt-1">Enter your email and we'll send a reset link.</p>
+              </div>
+
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email address</Label>
-                  <Input id="email" type="email" placeholder="you@example.com" {...register('email', { required: true })} />
+                  <Label htmlFor="email" className="text-[#1a1814] font-medium">Email address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    className="rounded-full bg-white/70 border-[#d4cfc0] h-12 px-5 focus:border-primary focus:ring-primary"
+                    {...register('email', { required: true })}
+                  />
                 </div>
-                <Button type="submit" className="w-full" variant="gradient" disabled={loading}>
+
+                <Button type="submit" variant="gradient" className="w-full rounded-full h-12 text-base" disabled={loading}>
                   {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : 'Send reset link'}
                 </Button>
+
                 <Link href="/auth/login">
-                  <Button variant="ghost" className="w-full"><ArrowLeft className="mr-2 h-4 w-4" />Back to login</Button>
+                  <Button variant="ghost" className="w-full rounded-full text-[#6b6456] hover:text-[#1a1814] gap-2">
+                    <ArrowLeft className="h-4 w-4" />Back to login
+                  </Button>
                 </Link>
               </form>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

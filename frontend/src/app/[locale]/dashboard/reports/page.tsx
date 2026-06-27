@@ -25,15 +25,15 @@ export default function ReportsPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-border/50 p-5">
+        <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl p-5">
           <p className="text-sm text-muted-foreground">Total translations</p>
           <p className="text-3xl font-bold mt-1">{translations.length}</p>
         </Card>
-        <Card className="border-border/50 p-5">
+        <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl p-5">
           <p className="text-sm text-muted-foreground">Completed</p>
           <p className="text-3xl font-bold mt-1 text-emerald-500">{completed.length}</p>
         </Card>
-        <Card className="border-border/50 p-5">
+        <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl p-5">
           <p className="text-sm text-muted-foreground">Avg. confidence</p>
           <p className={cn('text-3xl font-bold mt-1', getConfidenceColor(avgConfidence))}>
             {avgConfidence.toFixed(1)}%
@@ -41,7 +41,7 @@ export default function ReportsPage() {
         </Card>
       </div>
 
-      <Card className="border-border/50">
+      <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl">
         <CardHeader><CardTitle className="text-sm">By Domain</CardTitle></CardHeader>
         <CardContent>
           {Object.entries(byDomain).length === 0 ? (

@@ -39,7 +39,7 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <Card className="border-border/50">
+      <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-primary/10 rounded-lg"><User className="h-5 w-5 text-primary" /></div>
@@ -73,7 +73,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/50">
+      <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-primary/10 rounded-lg"><Shield className="h-5 w-5 text-primary" /></div>

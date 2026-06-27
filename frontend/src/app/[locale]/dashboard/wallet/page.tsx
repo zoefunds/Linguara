@@ -46,7 +46,7 @@ export default function WalletPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <Card className="border-border/50">
+      <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-indigo-500/10 rounded-lg"><Wallet className="h-5 w-5 text-indigo-400" /></div>
@@ -75,7 +75,7 @@ export default function WalletPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/50">
+      <Card className="border-[#d4cfc0] bg-white/60 rounded-2xl">
         <CardHeader>
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-red-500/10 rounded-lg"><AlertTriangle className="h-5 w-5 text-red-400" /></div>
